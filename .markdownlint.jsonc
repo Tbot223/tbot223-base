@@ -1,0 +1,24 @@
+{
+  // markdownlint configuration for the tbot223-base repository.
+  // The documentation contracts under docs/CONTRACT/ define an intentional
+  // house style. The two rules below conflict with that style on purpose,
+  // so they are relaxed here rather than worked around in every file.
+
+  // Inherit the default rule set; only the entries below are overridden.
+  "default": true,
+
+  // MD041 (first-line-h1): contract and bilingual docs intentionally begin
+  // with a language-switch link and a "Contract revision" banner before the
+  // first H1, so the first line is deliberately not a top-level heading.
+  "MD041": false,
+
+  // MD060 (table-column-style): the documented table examples use compact
+  // delimiter rows (e.g. |-----|------|), which render correctly on GitHub
+  // Flavored Markdown and are part of the contract's own examples.
+  "MD060": false,
+
+  // MD013 (line-length): the contracts use wide Markdown tables, inline code
+  // samples, and Korean prose that intentionally exceed 80 columns; wrapping
+  // them would break the tables and hurt readability.
+  "MD013": false
+}
