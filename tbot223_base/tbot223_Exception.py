@@ -10,7 +10,7 @@ from functools import wraps
 import threading
 
 # internal modules
-from tbot223_base.tbot223_Result import Result
+from tbot223_base.tbot223_Result import Result, ResultStatus
 
 class ExceptionTrackerHelper():
     """
@@ -90,6 +90,7 @@ class ExceptionTrackerHelper():
         """
         return {
             "id": None,
+            "status": None,
             "success": None,
             "timestamp": None,
             "quick_info": None,
@@ -99,7 +100,7 @@ class ExceptionTrackerHelper():
                 "message": None,
             },
             "location": {
-                "recent": {
+                "entry": {
                     "file": None,
                     "line": None,
                     "function": None
@@ -133,6 +134,36 @@ class ExceptionTrackerHelper():
             }
         }
 
+    @staticmethod
+    def get_public_error_info_structure():
+        """
+        Return the base structure for lightweight public error information.
+
+        ### Arguments
+        None
+
+        ### Returns
+        `dict` — A template dictionary safe for public-facing error payloads.
+
+        ### Example
+        >>> from tbot223_base.tbot223_Exception import ExceptionTrackerHelper
+        >>> helper = ExceptionTrackerHelper()
+        >>> public_error_info = helper.get_public_error_info_structure()
+        >>> print(public_error_info)
+        """
+        return {
+            "id": None,
+            "status": None,
+            "success": None,
+            "timestamp": None,
+            "error": {
+                "code": None,
+                "message": None,
+            },
+            "tags": {},
+            "retryable": None
+        }
+
 
 class ExceptionTracker():
     """
@@ -147,6 +178,8 @@ class ExceptionTracker():
     MASKED_VALUE = "<MASKED>"
     DEFAULT_TRACEBACK_LIMIT = 5
     MAX_TRACEBACK_LIMIT = 10000
+    DEFAULT_PUBLIC_ERROR_CODE = "UNEXPECTED_ERROR"
+    DEFAULT_PUBLIC_MESSAGE = "The operation could not be completed."
     DEFAULT_MASK_PRESETS = ("default",)
     MASK_PRESETS = {
         "default": (
@@ -195,6 +228,44 @@ class ExceptionTracker():
         if not location.get("file"):
             return "<unknown>"
         return f"'{location['file']}', line {location['line']}, in {location['function']}"
+
+    @staticmethod
+    def _normalize_public_context(public_context: Any) -> Optional[str]:
+        """Normalize public context into a safe optional string."""
+        if isinstance(public_context, str) and public_context:
+            return public_context
+        return None
+
+    @classmethod
+    def _build_public_error_info(
+        cls,
+        error_code: Any=None,
+        public_message: Any=None,
+        tags: Any=None,
+        retryable: Any=None,
+    ) -> dict:
+        """Build a lightweight public-safe error payload."""
+        public_error_info = ExceptionTrackerHelper.get_public_error_info_structure()
+        public_error_info["id"] = str(uuid.uuid4())
+        public_error_info["status"] = ResultStatus.FAILURE.value
+        public_error_info["success"] = False
+        public_error_info["timestamp"] = time.strftime("%Y-%m-%dT%H:%M:%SZ", time.gmtime())
+        public_error_info["error"]["code"] = (
+            cls.DEFAULT_PUBLIC_ERROR_CODE
+            if error_code is None else error_code
+        )
+        public_error_info["error"]["message"] = (
+            public_message
+            if isinstance(public_message, str) and public_message
+            else cls.DEFAULT_PUBLIC_MESSAGE
+        )
+        public_error_info["tags"] = (
+            {str(key): value for key, value in tags.items()}
+            if isinstance(tags, dict)
+            else {}
+        )
+        public_error_info["retryable"] = retryable if isinstance(retryable, bool) else None
+        return public_error_info
 
     @classmethod
     def _normalize_limit(cls, limit: int) -> int:
@@ -447,15 +518,15 @@ class ExceptionTracker():
             tb = traceback.extract_tb(error.__traceback__)
             origin_frame = tb[-1] if tb else None
             origin_location = self._frame_to_location(origin_frame)
-            return Result(True, None, None, self._format_location(origin_location))
+            return Result(ResultStatus.SUCCESS, None, None, self._format_location(origin_location))
         except Exception as e:
             print("An error occurred while handling another exception. This may indicate a critical issue.")
             tb_str = ''.join(traceback.format_exception(type(e), e, e.__traceback__))
-            return Result(False, f"{type(e).__name__} :{str(e)}", "Core.ExceptionTracker.get_exception_location, L1", tb_str)
+            return Result(ResultStatus.FAILURE, f"{type(e).__name__} :{str(e)}", "Core.ExceptionTracker.get_exception_location, L1", tb_str)
 
     def get_exception_info(self, error: Exception, user_input: Any=None, params: Tuple[Tuple, dict]=((), {}), mask_presets: Any=DEFAULT_MASK_PRESETS, mask_paths: Any=(), traceback_frame_limit: int=DEFAULT_TRACEBACK_LIMIT, cause_limit: int=DEFAULT_TRACEBACK_LIMIT) -> Result:
         """
-        Build structured exception information.
+        Build detailed internal exception information.
 
         ### Arguments
         | Tag | Name | Type | Description |
@@ -488,6 +559,8 @@ class ExceptionTracker():
         > - Use `mask_presets=("private", "traceback", "system_info")` or explicit `mask_paths` before exposing error information outside a trusted boundary.
 
         ### Note
+        > - This is the debug-heavy path for internal diagnostics.
+        > - For safe external payloads, use `get_public_exception_info()` instead.
         > - `mask_paths` accepts a single dot path such as `"location.origin"`.
         > - `mask_paths` accepts a single tuple path such as `("location", "origin")`.
         > - Use a list for multiple paths, such as `["id", "quick_info", ("error", "message")]`.
@@ -504,7 +577,7 @@ class ExceptionTracker():
         >>>         mask_presets=("private", "traceback"),
         >>>         mask_paths=["id", ("error", "message")]
         >>>     )
-        >>>     print(result.success)
+        >>>     print(result.status)
         """
         try:
             preset_mask_paths = self._get_preset_mask_paths(mask_presets)
@@ -512,7 +585,7 @@ class ExceptionTracker():
             traceback_frame_limit = self._normalize_limit(traceback_frame_limit)
             cause_limit = self._normalize_limit(cause_limit)
             tb = traceback.extract_tb(error.__traceback__)
-            recent_frame = tb[0] if tb else None
+            entry_frame = tb[0] if tb else None
             origin_frame = tb[-1] if tb else None
             origin_location = self._frame_to_location(origin_frame)
             limited_frames = tb[-traceback_frame_limit:] if traceback_frame_limit else []
@@ -524,12 +597,13 @@ class ExceptionTracker():
 
             error_info = ExceptionTrackerHelper.get_error_info_structure()
             error_info["id"] = str(uuid.uuid4())
+            error_info["status"] = ResultStatus.FAILURE.value
             error_info["success"] = False
             error_info["timestamp"] = time.strftime("%Y-%m-%dT%H:%M:%SZ", time.gmtime())
             error_info["quick_info"] = f"{type(error).__name__}: {str(error)}"
             error_info["error"]["type"] = type(error).__name__
             error_info["error"]["message"] = str(error)
-            error_info["location"]["recent"] = self._frame_to_location(recent_frame)
+            error_info["location"]["entry"] = self._frame_to_location(entry_frame)
             error_info["location"]["origin"] = origin_location
             error_info["input_context"]["user_input"] = user_input
             error_info["input_context"]["params"]["args"] = args
@@ -547,16 +621,68 @@ class ExceptionTracker():
             self._mask_paths(error_info, preset_mask_paths)
             self._mask_paths(error_info, extra_mask_paths)
 
-            return Result(False, error_info["quick_info"], self._format_location(origin_location), error_info)
+            return Result(ResultStatus.FAILURE, error_info["quick_info"], self._format_location(origin_location), error_info)
         except Exception as e:
             print("An error occurred while handling another exception. This may indicate a critical issue.")
             tb_str = ''.join(traceback.format_exception(type(e), e, e.__traceback__))
-            return Result(False, f"{type(e).__name__} :{str(e)}", "Core.ExceptionTracker.get_exception_info, L1", tb_str)
+            return Result(ResultStatus.FAILURE, f"{type(e).__name__} :{str(e)}", "Core.ExceptionTracker.get_exception_info, L1", tb_str)
+
+    def get_public_exception_info(self, error: Exception, error_code: Any=None, public_message: Optional[str]=None, public_context: Optional[str]=None, tags: Optional[Dict[str, Any]]=None, retryable: Optional[bool]=None) -> Result:
+        """
+        Build lightweight public exception information safe to expose externally.
+
+        ### Arguments
+        | Tag | Name | Type | Description |
+        |-----|------|------|-------------|
+        | **(R)** | `error` | `Exception` | The exception object that triggered the failure. |
+        | **(O)** | `error_code` | `Any` | Public-facing error code. Default: `"UNEXPECTED_ERROR"`. |
+        | **(O)** | `public_message` | `Optional[str]` | Public-facing error message. Default: generic safe message. |
+        | **(O)** | `public_context` | `Optional[str]` | Public-facing context string for the returned `Result`. Default: `None`. |
+        | **(O)** | `tags` | `Optional[Dict[str, Any]]` | Public metadata tags to attach to the payload. Default: `None`. |
+        | **(O)** | `retryable` | `Optional[bool]` | Whether the caller may retry the operation. Default: `None`. |
+
+        ### Returns
+        `Result` — Contains lightweight public error information in `data`.
+
+        ### Note
+        > - This path avoids collecting traceback text, local variables, params, and system information.
+        > - The payload is designed for API responses, UI surfaces, or other untrusted boundaries.
+        > - `error` is accepted for API symmetry, but its raw message is not exposed unless you pass a safe `public_message`.
+
+        ### Example
+        >>> from tbot223_base.tbot223_Exception import ExceptionTracker
+        >>> tracker = ExceptionTracker()
+        >>> try:
+        >>>     1 / 0
+        >>> except Exception as e:
+        >>>     result = tracker.get_public_exception_info(
+        >>>         e,
+        >>>         error_code="DIVIDE_BY_ZERO",
+        >>>         public_message="The calculation could not be completed.",
+        >>>         tags={"layer": "service"},
+        >>>         retryable=False
+        >>>     )
+        >>>     print(result.data["error"]["code"])
+        """
+        try:
+            normalized_context = self._normalize_public_context(public_context)
+            public_error_info = self._build_public_error_info(
+                error_code=error_code,
+                public_message=public_message,
+                tags=tags,
+                retryable=retryable,
+            )
+            return Result(ResultStatus.FAILURE, public_error_info["error"]["message"], normalized_context, public_error_info)
+        except Exception:
+            print("An error occurred while building public exception information. Falling back to a safe generic payload.")
+            normalized_context = self._normalize_public_context(public_context)
+            fallback_error_info = self._build_public_error_info(tags={"tracker_failure": True})
+            return Result(ResultStatus.FAILURE, fallback_error_info["error"]["message"], normalized_context, fallback_error_info)
 
     # L2 Methods
     def get_exception_return(self, error: Exception, user_input: Any=None, params: Tuple[Tuple, dict]=((), {}), mask_presets: Any=DEFAULT_MASK_PRESETS, mask_paths: Any=()) -> Result:
         """
-        Build a standardized failure `Result` from an exception.
+        Build a standardized debug-heavy failure `Result` from an exception.
 
         ### Arguments
         | Tag | Name | Type | Description |
@@ -585,6 +711,10 @@ class ExceptionTracker():
         > **Security:**
         > - The returned error information may contain sensitive data unless suitable `mask_presets` or `mask_paths` are used.
 
+        ### Note
+        > - This method keeps the existing debug-oriented payload behavior.
+        > - For public-safe failure results, use `get_public_exception_return()` instead.
+
         ### Example
         >>> from tbot223_base.tbot223_Exception import ExceptionTracker
         >>> tracker = ExceptionTracker()
@@ -594,11 +724,53 @@ class ExceptionTracker():
         ...     res = tracker.get_exception_return(e, user_input="Divide", params=((), {}), mask_presets=("private",))
         """
         try:
-            return Result(False, f"{type(error).__name__} :{str(error)}", self.get_exception_location(error).data, self.get_exception_info(error, user_input, params, mask_presets=mask_presets, mask_paths=mask_paths).data)
+            return Result(ResultStatus.FAILURE, f"{type(error).__name__} :{str(error)}", self.get_exception_location(error).data, self.get_exception_info(error, user_input, params, mask_presets=mask_presets, mask_paths=mask_paths).data)
         except Exception as e:
             print("An error occurred while handling another exception. This may indicate a critical issue.")
             tb_str = ''.join(traceback.format_exception(type(e), e, e.__traceback__))
-            return Result(False, f"{type(e).__name__} :{str(e)}", "Core.ExceptionTracker.get_exception_return, L2", tb_str)
+            return Result(ResultStatus.FAILURE, f"{type(e).__name__} :{str(e)}", "Core.ExceptionTracker.get_exception_return, L2", tb_str)
+
+    def get_public_exception_return(self, error: Exception, error_code: Any=None, public_message: Optional[str]=None, public_context: Optional[str]=None, tags: Optional[Dict[str, Any]]=None, retryable: Optional[bool]=None) -> Result:
+        """
+        Build a standardized public-safe failure `Result` from an exception.
+
+        ### Arguments
+        | Tag | Name | Type | Description |
+        |-----|------|------|-------------|
+        | **(R)** | `error` | `Exception` | The exception object that triggered the failure. |
+        | **(O)** | `error_code` | `Any` | Public-facing error code. Default: `"UNEXPECTED_ERROR"`. |
+        | **(O)** | `public_message` | `Optional[str]` | Public-facing error message. Default: generic safe message. |
+        | **(O)** | `public_context` | `Optional[str]` | Public-facing context string for the returned `Result`. Default: `None`. |
+        | **(O)** | `tags` | `Optional[Dict[str, Any]]` | Public metadata tags to attach to the payload. Default: `None`. |
+        | **(O)** | `retryable` | `Optional[bool]` | Whether the caller may retry the operation. Default: `None`. |
+
+        ### Returns
+        `Result` — Contains a lightweight public-safe failure result.
+
+        ### Note
+        > - This method is a public-safe counterpart to `get_exception_return()`.
+        > - It does not collect traceback text, local variables, params, or system information.
+
+        ### Example
+        >>> from tbot223_base.tbot223_Exception import ExceptionTracker
+        >>> tracker = ExceptionTracker()
+        >>> try:
+        ...     1 / 0
+        ... except Exception as e:
+        ...     res = tracker.get_public_exception_return(
+        ...         e,
+        ...         error_code="DIVIDE_BY_ZERO",
+        ...         public_message="The calculation could not be completed."
+        ...     )
+        """
+        return self.get_public_exception_info(
+            error=error,
+            error_code=error_code,
+            public_message=public_message,
+            public_context=public_context,
+            tags=tags,
+            retryable=retryable,
+        )
 
     def get_error_code(self, error_id_map: dict, error: Exception) -> Result:
         """
@@ -634,11 +806,11 @@ class ExceptionTracker():
             if type(error).__name__ not in error_id_map:
                 raise KeyError(f"Error type '{type(error).__name__}' not found in error_id_map.")
             else:
-                return Result(True, None, None, error_id_map[type(error).__name__])
+                return Result(ResultStatus.SUCCESS, None, None, error_id_map[type(error).__name__])
         except Exception as e:
             print("An error occurred while handling another exception. This may indicate a critical issue.")
             tb_str = ''.join(traceback.format_exception(type(e), e, e.__traceback__))
-            return Result(False, f"{type(e).__name__} :{str(e)}", "Core.ExceptionTracker.get_error_code, L2", tb_str)
+            return Result(ResultStatus.FAILURE, f"{type(e).__name__} :{str(e)}", "Core.ExceptionTracker.get_error_code, L2", tb_str)
 
 class ExceptionTrackerDecorator():
     """
@@ -684,7 +856,7 @@ class ExceptionTrackerDecorator():
     ...     return x / y
     >>> risky_function = ExceptionTrackerDecorator(mask_presets=("private", "traceback"), mask_paths=["id"], tracker=tracker)(risky_function)
     >>> result = risky_function(10, y=0)
-    >>> print(result.success)
+    >>> print(result.status)
     """
     def __init__(self, mask_presets: Any=ExceptionTracker.DEFAULT_MASK_PRESETS, mask_paths: Any=(), tracker: Optional[ExceptionTracker]=None):
         self.tracker = tracker or ExceptionTracker()
