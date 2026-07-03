@@ -58,3 +58,25 @@ def test_result_predicates_and_unwrap_helpers():
     with pytest.raises(ResultUnwrapException) as cancelled_error:
         cancelled_result.expect()
     assert cancelled_error.value.error == "Operation was cancelled or not executed."
+
+
+def test_result_cancelled_success_property_and_unwrap():
+    result = Result(ResultStatus.CANCELLED, None, "Skipped", None)
+
+    assert result.success is None
+
+    with pytest.raises(ResultUnwrapException) as error:
+        result.unwrap()
+
+    assert error.value.error == "Operation was cancelled or not executed."
+    assert error.value.context == "Skipped"
+
+
+def test_result_expect_uses_custom_message_for_failure():
+    result = Result(ResultStatus.FAILURE, "raw failure", "Check", {"debug": True})
+
+    with pytest.raises(ResultUnwrapException) as error:
+        result.expect("custom failure")
+
+    assert error.value.error == "custom failure"
+    assert error.value.data == {"debug": True}

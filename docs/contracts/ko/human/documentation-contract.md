@@ -1,4 +1,4 @@
-[English](../../en/FOR_HUMAN/DOCUMENTATION_CONTRACT.md)
+[English](../../en/human/documentation-contract.md)
 
 > Contract revision: 2026-06-23.
 
@@ -21,7 +21,7 @@
 
 - 루트 README와 언어별 README.
 - `docs/en`, `docs/ko` 아래 장문 문서.
-- `docs/CONTRACT` 아래 계약 문서.
+- `docs/contracts` 아래 계약 문서.
 - 저장소의 Markdown 문서.
 
 이 계약은 다음에는 적용하지 않는다.

@@ -1,4 +1,4 @@
-[한국어 (Korean)](../../ko/FOR_HUMAN/DOCSTRING_CONTRACT.md)
+[한국어 (Korean)](../../ko/human/docstring-contract.md)
 
 > Contract revision: 2026-06-23.
 
@@ -368,8 +368,10 @@ An example based on the real `ExceptionTracker.get_exception_info` in `tbot223_b
 def get_exception_info(
     self,
     error: Exception,
-    mask_presets: Any = ("default",),
-    mask_paths: Any = (),
+    user_input: object = None,
+    params: ExceptionParams = ((), {}),
+    mask_presets: MaskPresetsInput = ("default",),
+    mask_paths: MaskPathsInput = (),
 ) -> Result:
     """
     Build structured exception information.
@@ -378,8 +380,10 @@ def get_exception_info(
     | Tag | Name | Type | Description |
     |-----|------|------|-------------|
     | **(R)** | `error` | `Exception` | The exception object to describe. |
-    | **(O)** | `mask_presets` | `Any` | Named mask presets. Default: `("default",)`. |
-    | **(O)** | `mask_paths` | `Any` | Extra paths to mask. Default: `()`. |
+    | **(O)** | `user_input` | `object` | User input context. Stored as a bounded snapshot. Default: `None`. |
+    | **(O)** | `params` | `ExceptionParams` | Additional call context `(args, kwargs)`. Stored as bounded snapshots. Default: `((), {})`. |
+    | **(O)** | `mask_presets` | `MaskPresetsInput` | Named mask presets. Default: `("default",)`. |
+    | **(O)** | `mask_paths` | `MaskPathsInput` | Extra paths to mask. Default: `()`. |
 
     ### Enum
     > `mask_presets` — type: `str`
@@ -397,10 +401,12 @@ def get_exception_info(
 
     ### Warning
     > **Security:**
-    > - `user_input`, `params`, `local_variables`, `traceback`, and `system_info` may contain sensitive data.
+    > - `user_input`, `params`, and `local_variables` are stored as bounded snapshots rather than raw object references.
+    > - Snapshot metadata, `traceback`, and `system_info` may still contain sensitive data.
     > - Apply `mask_presets=("private", "traceback", "system_info")` before exposing error information outside a trusted boundary.
 
     ### Note
+    > Context snapshots preserve small primitives directly and summarize large or custom objects with type, length, preview, and truncation metadata.
     > Unknown preset names and invalid mask paths are ignored rather than rejected.
 
     ### Example

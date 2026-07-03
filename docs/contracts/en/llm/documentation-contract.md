@@ -1,4 +1,4 @@
-[한국어 (Korean)](../../ko/FOR_LLM/DOCUMENTATION_CONTRACT.md)
+[한국어 (Korean)](../../ko/llm/documentation-contract.md)
 
 > Contract revision: 2026-06-23.
 
@@ -8,7 +8,7 @@
 
 ## Read First
 
-Read [../FOR_HUMAN/DOCUMENTATION_CONTRACT.md](../FOR_HUMAN/DOCUMENTATION_CONTRACT.md) first.
+Read [../human/documentation-contract.md](../human/documentation-contract.md) first.
 
 - The human-facing document is the canonical rule set.
 - This file is an execution guide, not a replacement summary.
@@ -106,8 +106,8 @@ Read [../FOR_HUMAN/DOCUMENTATION_CONTRACT.md](../FOR_HUMAN/DOCUMENTATION_CONTRAC
 ## Paste-Ready Prompt
 
 ```text
-First read docs/CONTRACT/en/FOR_HUMAN/DOCUMENTATION_CONTRACT.md,
-then use docs/CONTRACT/en/FOR_LLM/DOCUMENTATION_CONTRACT.md as the execution guide
+First read docs/contracts/en/human/documentation-contract.md,
+then use docs/contracts/en/llm/documentation-contract.md as the execution guide
 to write or revise the Markdown document I just gave you.
 Keep the correct document type, preserve verified facts only,
 for README, Guide, Reference, and Contract docs place the top metadata as language link -> version basis -> title,

@@ -18,7 +18,7 @@ class ResultStatus(str, Enum):
     CANCELLED = "cancelled"
 
     @classmethod
-    def normalize(cls, value: Union["ResultStatus", bool, None, str]) -> "ResultStatus":
+    def normalize(cls, value: Union["ResultStatus", bool, None, str, object]) -> "ResultStatus":
         """
         Normalize legacy and string input into a `ResultStatus`.
         """

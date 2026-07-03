@@ -17,4 +17,4 @@ This directory is the entry point for repository writing contracts.
 - English: [en/README.md](en/README.md)
 - Korean: [ko/README.md](ko/README.md)
 
-For docstring compatibility notes, see [../DOCSTRING_CONTRACT.md](../DOCSTRING_CONTRACT.md).
+Canonical contract files live under this lowercase path tree.

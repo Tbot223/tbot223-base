@@ -1,4 +1,4 @@
-[English](../../en/FOR_LLM/DOCSTRING_CONTRACT.md)
+[English](../../en/llm/docstring-contract.md)
 
 > Contract revision: 2026-06-23.
 
@@ -8,9 +8,9 @@
 
 ## 먼저 할 일
 
-이 문서를 읽기 전에 반드시 [../FOR_HUMAN/DOCSTRING_CONTRACT.md](../FOR_HUMAN/DOCSTRING_CONTRACT.md)를 먼저 읽는다.
+이 문서를 읽기 전에 반드시 [../human/docstring-contract.md](../human/docstring-contract.md)를 먼저 읽는다.
 
-- `FOR_HUMAN` 문서는 규약의 정본이다.
+- 사람용 문서는 규약의 정본이다.
 - 이 문서는 정본을 요약 대체하지 않는다.
 - 작성 중 충돌이 생기면 사람용 정본이 우선이다.
 
@@ -23,7 +23,7 @@
 
 ## 읽기 절차
 
-1. 먼저 [../FOR_HUMAN/DOCSTRING_CONTRACT.md](../FOR_HUMAN/DOCSTRING_CONTRACT.md)를 끝까지 읽는다.
+1. 먼저 [../human/docstring-contract.md](../human/docstring-contract.md)를 끝까지 읽는다.
 2. 렌더링 대상, 적용 범위, 섹션 구조, 표현 규칙을 이해한다.
 3. 그 다음 이 문서를 읽고, 실제 코드에서 무엇을 추출해야 하는지 확인한다.
 4. 작성 중 충돌이 생기면 사람용 정본 기준으로 되돌린다.
@@ -203,8 +203,8 @@
 ## 붙여넣기용 프롬프트
 
 ```text
-먼저 docs/CONTRACT/ko/FOR_HUMAN/DOCSTRING_CONTRACT.md를 읽고 규약을 익힌 뒤,
-docs/CONTRACT/ko/FOR_LLM/DOCSTRING_CONTRACT.md를 작업 지시서로 사용해서 방금 준 코드의 docstring을 작성해줘.
+먼저 docs/contracts/ko/human/docstring-contract.md를 읽고 규약을 익힌 뒤,
+docs/contracts/ko/llm/docstring-contract.md를 작업 지시서로 사용해서 방금 준 코드의 docstring을 작성해줘.
 Markdown-heavy 형식은 유지하되 Markdown을 렌더링하는 IDE hover/peek를 1차 소비자로 가정하고,
 공개 API와 중요한 internal 메서드는 full docstring 대상으로 보고,
 Constraint는 코드의 if문, raise, 실패 반환 로직을 분석해서 허용된 정형 패턴으로만 작성하고,

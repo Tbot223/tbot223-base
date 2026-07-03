@@ -1,4 +1,4 @@
-[한국어 (Korean)](../../ko/FOR_HUMAN/DOCUMENTATION_CONTRACT.md)
+[한국어 (Korean)](../../ko/human/documentation-contract.md)
 
 > Contract revision: 2026-06-23.
 
@@ -21,7 +21,7 @@ This contract applies to:
 
 - Root and language-specific README files.
 - Long-form docs under docs/en and docs/ko.
-- Contract docs under docs/CONTRACT.
+- Contract docs under docs/contracts.
 - Markdown documents only.
 
 This contract does not apply to:

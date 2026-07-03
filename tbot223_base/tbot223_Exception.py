@@ -5,12 +5,24 @@ import platform
 import time
 import traceback
 import uuid
-from typing import Any, Tuple, Callable, Union, List, Dict, Optional
+from collections.abc import Iterable, Mapping, Sized
+from typing import Callable, Dict, List, Literal, Optional, ParamSpec, Tuple, TypeAlias, TypeGuard, TypeVar, Union, cast
 from functools import wraps
 import threading
 
 # internal modules
 from tbot223_base.tbot223_Result import Result, ResultStatus
+
+MaskPreset: TypeAlias = Literal["default", "private", "user_input", "params", "traceback", "system_info"]
+MaskPath: TypeAlias = Union[str, Tuple[str, ...]]
+MaskPresetsInput: TypeAlias = Optional[Union[MaskPreset, Iterable[MaskPreset]]]
+MaskPathsInput: TypeAlias = Optional[Union[MaskPath, Iterable[MaskPath]]]
+ExceptionParams: TypeAlias = Tuple[Tuple[object, ...], Mapping[str, object]]
+PublicTags: TypeAlias = Mapping[object, object]
+PublicErrorCode: TypeAlias = Union[str, int]
+
+P = ParamSpec("P")
+R = TypeVar("R")
 
 class ExceptionTrackerHelper():
     """
@@ -180,8 +192,11 @@ class ExceptionTracker():
     MAX_TRACEBACK_LIMIT = 10000
     DEFAULT_PUBLIC_ERROR_CODE = "UNEXPECTED_ERROR"
     DEFAULT_PUBLIC_MESSAGE = "The operation could not be completed."
-    DEFAULT_MASK_PRESETS = ("default",)
-    MASK_PRESETS = {
+    DEFAULT_MASK_PRESETS: Tuple[MaskPreset, ...] = ("default",)
+    CONTEXT_MAX_REPR_LENGTH = 200
+    CONTEXT_MAX_ITEMS = 20
+    CONTEXT_MAX_DEPTH = 2
+    MASK_PRESETS: Dict[MaskPreset, Tuple[Tuple[str, ...], ...]] = {
         "default": (
             ("input_context", "local_variables"),
         ),
@@ -230,7 +245,7 @@ class ExceptionTracker():
         return f"'{location['file']}', line {location['line']}, in {location['function']}"
 
     @staticmethod
-    def _normalize_public_context(public_context: Any) -> Optional[str]:
+    def _normalize_public_context(public_context: object) -> Optional[str]:
         """Normalize public context into a safe optional string."""
         if isinstance(public_context, str) and public_context:
             return public_context
@@ -239,10 +254,10 @@ class ExceptionTracker():
     @classmethod
     def _build_public_error_info(
         cls,
-        error_code: Any=None,
-        public_message: Any=None,
-        tags: Any=None,
-        retryable: Any=None,
+        error_code: Optional[PublicErrorCode]=None,
+        public_message: Optional[str]=None,
+        tags: Optional[PublicTags]=None,
+        retryable: Optional[bool]=None,
     ) -> dict:
         """Build a lightweight public-safe error payload."""
         public_error_info = ExceptionTrackerHelper.get_public_error_info_structure()
@@ -261,7 +276,7 @@ class ExceptionTracker():
         )
         public_error_info["tags"] = (
             {str(key): value for key, value in tags.items()}
-            if isinstance(tags, dict)
+            if isinstance(tags, Mapping)
             else {}
         )
         public_error_info["retryable"] = retryable if isinstance(retryable, bool) else None
@@ -309,8 +324,209 @@ class ExceptionTracker():
             return {}
         return dict(origin_tb.tb_frame.f_locals)
 
+    @classmethod
+    def _get_type_name(cls, value: object) -> str:
+        value_type = type(value)
+        if value_type.__module__ == "builtins":
+            return value_type.__qualname__
+        return f"{value_type.__module__}.{value_type.__qualname__}"
+
+    @classmethod
+    def _safe_len(cls, value: object) -> Optional[int]:
+        if not isinstance(value, Sized):
+            return None
+        try:
+            return len(value)
+        except Exception:
+            return None
+
+    @classmethod
+    def _safe_shape(cls, value: object) -> Optional[object]:
+        try:
+            shape = getattr(value, "shape")
+        except Exception:
+            return None
+
+        if shape is None or isinstance(shape, (bool, int, float, str)):
+            return shape
+        if isinstance(shape, tuple):
+            return tuple(cls._snapshot_shape_part(part) for part in shape[:cls.CONTEXT_MAX_ITEMS])
+        if isinstance(shape, list):
+            return [cls._snapshot_shape_part(part) for part in shape[:cls.CONTEXT_MAX_ITEMS]]
+        return cls._get_type_name(shape)
+
+    @classmethod
+    def _snapshot_shape_part(cls, value: object) -> object:
+        if value is None or isinstance(value, (bool, int, float, str)):
+            return value
+        return cls._get_type_name(value)
+
+    @classmethod
+    def _safe_repr(cls, value: object) -> Tuple[str, bool]:
+        if type(value).__module__ == "builtins":
+            try:
+                representation = repr(value)
+            except Exception:
+                representation = object.__repr__(value)
+        else:
+            representation = object.__repr__(value)
+
+        if len(representation) > cls.CONTEXT_MAX_REPR_LENGTH:
+            return representation[:cls.CONTEXT_MAX_REPR_LENGTH], True
+        return representation, False
+
+    @classmethod
+    def _metadata_snapshot(cls, value: object, truncated: bool=False) -> Dict[str, object]:
+        if isinstance(value, (Mapping, list, tuple, set, frozenset)):
+            representation = f"<{cls._get_type_name(value)} snapshot omitted>"
+            repr_truncated = True
+        else:
+            representation, repr_truncated = cls._safe_repr(value)
+
+        snapshot: Dict[str, object] = {
+            "type": cls._get_type_name(value),
+            "repr": representation,
+            "truncated": truncated or repr_truncated,
+        }
+
+        length = cls._safe_len(value)
+        if length is not None:
+            snapshot["length"] = length
+
+        shape = cls._safe_shape(value)
+        if shape is not None:
+            snapshot["shape"] = shape
+
+        return snapshot
+
+    @classmethod
+    def _bytes_snapshot(cls, value: Union[bytes, bytearray, memoryview]) -> Dict[str, object]:
+        if isinstance(value, memoryview):
+            length = value.nbytes
+            try:
+                preview_value = value[:cls.CONTEXT_MAX_REPR_LENGTH].tobytes()
+            except Exception:
+                preview_value = b""
+        else:
+            length = cls._safe_len(value) or 0
+            preview_value = bytes(value[:cls.CONTEXT_MAX_REPR_LENGTH])
+
+        preview, repr_truncated = cls._safe_repr(preview_value)
+        return {
+            "type": cls._get_type_name(value),
+            "length": length,
+            "preview": preview,
+            "truncated": length > cls.CONTEXT_MAX_REPR_LENGTH or repr_truncated,
+        }
+
+    @classmethod
+    def _mapping_snapshot(cls, value: Mapping[object, object], depth: int, active_ids: set[int]) -> Dict[str, object]:
+        length = cls._safe_len(value)
+        items: Dict[str, object] = {}
+        entries: List[Dict[str, object]] = []
+        truncated = bool(length is not None and length > cls.CONTEXT_MAX_ITEMS)
+
+        try:
+            item_iterator = iter(value.items())
+            for index, (key, item) in enumerate(item_iterator):
+                if index >= cls.CONTEXT_MAX_ITEMS:
+                    truncated = True
+                    break
+
+                key_snapshot = cls._snapshot_context(key, depth + 1, active_ids)
+                value_snapshot = cls._snapshot_context(item, depth + 1, active_ids)
+
+                if isinstance(key_snapshot, str) and key_snapshot not in items:
+                    items[key_snapshot] = value_snapshot
+                else:
+                    entries.append({
+                        "key": key_snapshot,
+                        "value": value_snapshot,
+                    })
+        except Exception:
+            return cls._metadata_snapshot(value, truncated=True)
+
+        snapshot: Dict[str, object] = {
+            "type": cls._get_type_name(value),
+            "length": length,
+            "items": items,
+            "truncated": truncated,
+        }
+        if entries:
+            snapshot["entries"] = entries
+        return snapshot
+
+    @classmethod
+    def _sequence_snapshot(cls, value: Union[list, tuple, set, frozenset], depth: int, active_ids: set[int]) -> Dict[str, object]:
+        length = cls._safe_len(value)
+        items: List[object] = []
+        truncated = bool(length is not None and length > cls.CONTEXT_MAX_ITEMS)
+
+        try:
+            for index, item in enumerate(value):
+                if index >= cls.CONTEXT_MAX_ITEMS:
+                    truncated = True
+                    break
+                items.append(cls._snapshot_context(item, depth + 1, active_ids))
+        except Exception:
+            return cls._metadata_snapshot(value, truncated=True)
+
+        return {
+            "type": cls._get_type_name(value),
+            "length": length,
+            "items": items,
+            "truncated": truncated,
+        }
+
+    @classmethod
+    def _snapshot_context(cls, value: object, depth: int=0, active_ids: Optional[set[int]]=None) -> object:
+        if value is None or isinstance(value, (bool, int, float)):
+            return value
+
+        if isinstance(value, str):
+            if len(value) <= cls.CONTEXT_MAX_REPR_LENGTH:
+                return value
+            return {
+                "type": "str",
+                "length": len(value),
+                "preview": value[:cls.CONTEXT_MAX_REPR_LENGTH],
+                "truncated": True,
+            }
+
+        if isinstance(value, (bytes, bytearray, memoryview)):
+            return cls._bytes_snapshot(value)
+
+        if active_ids is None:
+            active_ids = set()
+
+        value_id = id(value)
+        if value_id in active_ids:
+            return {
+                "type": cls._get_type_name(value),
+                "cycle": True,
+            }
+
+        if depth >= cls.CONTEXT_MAX_DEPTH:
+            return cls._metadata_snapshot(value, truncated=True)
+
+        if isinstance(value, Mapping):
+            active_ids.add(value_id)
+            try:
+                return cls._mapping_snapshot(value, depth, active_ids)
+            finally:
+                active_ids.remove(value_id)
+
+        if isinstance(value, (list, tuple, set, frozenset)):
+            active_ids.add(value_id)
+            try:
+                return cls._sequence_snapshot(value, depth, active_ids)
+            finally:
+                active_ids.remove(value_id)
+
+        return cls._metadata_snapshot(value)
+
     @staticmethod
-    def _normalize_mask_path(path: Union[str, Tuple[str, ...]]) -> Tuple[str, ...]:
+    def _normalize_mask_path(path: MaskPath) -> Tuple[str, ...]:
         """Normalize a single mask path into tuple form."""
         if isinstance(path, str):
             return tuple(part for part in path.split(".") if part)
@@ -319,7 +535,7 @@ class ExceptionTracker():
         return ()
 
     @staticmethod
-    def _is_tuple_path(path: Any) -> bool:
+    def _is_tuple_path(path: object) -> TypeGuard[Tuple[str, ...]]:
         """Return whether `path` is a tuple path made only of `str` parts."""
         return isinstance(path, tuple) and all(isinstance(part, str) for part in path)
 
@@ -338,14 +554,14 @@ class ExceptionTracker():
         return tuple(deduped_paths)
 
     @classmethod
-    def _normalize_mask_paths(cls, paths: Any) -> Tuple[Tuple[str, ...], ...]:
+    def _normalize_mask_paths(cls, paths: MaskPathsInput) -> Tuple[Tuple[str, ...], ...]:
         """
         Normalize mask path input into internal tuple-path form.
 
         ### Arguments
         | Tag | Name | Type | Description |
         |-----|------|------|-------------|
-        | **(R)** | `paths` | `Any` | Mask path input. Accepts `None`, `str`, `Tuple[str, ...]`, or an iterable of those values. |
+        | **(R)** | `paths` | `MaskPathsInput` | Mask path input. Accepts `None`, `str`, `Tuple[str, ...]`, or an iterable of those values. |
 
         ### Returns
         `Tuple[Tuple[str, ...], ...]` — Contains normalized mask paths.
@@ -366,8 +582,9 @@ class ExceptionTracker():
             return (normalized_path,) if normalized_path else ()
 
         normalized_paths: List[Tuple[str, ...]] = []
+        path_items = cast(Iterable[MaskPath], paths)
         try:
-            path_iterator = iter(paths)
+            path_iterator = iter(path_items)
         except TypeError:
             return ()
 
@@ -378,17 +595,17 @@ class ExceptionTracker():
         return cls._dedupe_mask_paths(tuple(normalized_paths))
 
     @classmethod
-    def _normalize_mask_presets(cls, presets: Any) -> Tuple[str, ...]:
+    def _normalize_mask_presets(cls, presets: MaskPresetsInput) -> Tuple[MaskPreset, ...]:
         """
         Normalize mask preset input into known preset names.
 
         ### Arguments
         | Tag | Name | Type | Description |
         |-----|------|------|-------------|
-        | **(R)** | `presets` | `Any` | Preset name or iterable of preset names. Accepts `None`, `str`, or iterable input. |
+        | **(R)** | `presets` | `MaskPresetsInput` | Preset name or iterable of preset names. Accepts `None`, `str`, or iterable input. |
 
         ### Returns
-        `Tuple[str, ...]` — Contains known preset names without duplicates.
+        `Tuple[MaskPreset, ...]` — Contains known preset names without duplicates.
 
         ### Note
         > Unknown preset names and non-string entries are ignored.
@@ -398,7 +615,7 @@ class ExceptionTracker():
         if isinstance(presets, str):
             presets = (presets,)
 
-        normalized_presets: List[str] = []
+        normalized_presets: List[MaskPreset] = []
         seen_presets = set()
 
         try:
@@ -411,20 +628,20 @@ class ExceptionTracker():
                 continue
             if preset not in cls.MASK_PRESETS or preset in seen_presets:
                 continue
-            normalized_presets.append(preset)
+            normalized_presets.append(cast(MaskPreset, preset))
             seen_presets.add(preset)
 
         return tuple(normalized_presets)
 
     @classmethod
-    def _get_preset_mask_paths(cls, presets: Any) -> Tuple[Tuple[str, ...], ...]:
+    def _get_preset_mask_paths(cls, presets: MaskPresetsInput) -> Tuple[Tuple[str, ...], ...]:
         """
         Return mask paths selected by named presets.
 
         ### Arguments
         | Tag | Name | Type | Description |
         |-----|------|------|-------------|
-        | **(R)** | `presets` | `Any` | Preset name or iterable of preset names. Accepts `None`, `str`, or iterable input. |
+        | **(R)** | `presets` | `MaskPresetsInput` | Preset name or iterable of preset names. Accepts `None`, `str`, or iterable input. |
 
         ### Returns
         `Tuple[Tuple[str, ...], ...]` — Contains deduplicated mask paths for the selected presets.
@@ -470,8 +687,8 @@ class ExceptionTracker():
         for path in paths:
             cls._mask_path(error_info, path)
 
-    def _get_exception_causes(self, error: Exception, limit: int) -> List[Dict[str, Any]]:
-        causes: List[Dict[str, Any]] = []
+    def _get_exception_causes(self, error: Exception, limit: int) -> List[Dict[str, object]]:
+        causes: List[Dict[str, object]] = []
         seen = set()
         current_error = error.__cause__ or error.__context__
 
@@ -524,7 +741,16 @@ class ExceptionTracker():
             tb_str = ''.join(traceback.format_exception(type(e), e, e.__traceback__))
             return Result(ResultStatus.FAILURE, f"{type(e).__name__} :{str(e)}", "Core.ExceptionTracker.get_exception_location, L1", tb_str)
 
-    def get_exception_info(self, error: Exception, user_input: Any=None, params: Tuple[Tuple, dict]=((), {}), mask_presets: Any=DEFAULT_MASK_PRESETS, mask_paths: Any=(), traceback_frame_limit: int=DEFAULT_TRACEBACK_LIMIT, cause_limit: int=DEFAULT_TRACEBACK_LIMIT) -> Result:
+    def get_exception_info(
+        self,
+        error: Exception,
+        user_input: object=None,
+        params: ExceptionParams=((), {}),
+        mask_presets: MaskPresetsInput=DEFAULT_MASK_PRESETS,
+        mask_paths: MaskPathsInput=(),
+        traceback_frame_limit: int=DEFAULT_TRACEBACK_LIMIT,
+        cause_limit: int=DEFAULT_TRACEBACK_LIMIT
+    ) -> Result:
         """
         Build detailed internal exception information.
 
@@ -532,10 +758,10 @@ class ExceptionTracker():
         | Tag | Name | Type | Description |
         |-----|------|------|-------------|
         | **(R)** | `error` | `Exception` | The exception object to describe. |
-        | **(O)** | `user_input` | `Any` | User input context. Default: `None`. |
-        | **(O)** | `params` | `Tuple[Tuple, dict]` | Additional call context `(args, kwargs)`. Default: `((), {})`. |
-        | **(O)** | `mask_presets` | `Any` | Named mask presets. Default: `("default",)`. |
-        | **(O)** | `mask_paths` | `Any` | Extra paths to mask, such as `"id"`, `"location.origin"`, or `("error", "message")`. |
+        | **(O)** | `user_input` | `object` | User input context. Stored as a bounded snapshot. Default: `None`. |
+        | **(O)** | `params` | `ExceptionParams` | Additional call context `(args, kwargs)`. Stored as bounded snapshots. Default: `((), {})`. |
+        | **(O)** | `mask_presets` | `MaskPresetsInput` | Named mask presets. Default: `("default",)`. |
+        | **(O)** | `mask_paths` | `MaskPathsInput` | Extra paths to mask, such as `"id"`, `"location.origin"`, or `("error", "message")`. |
         | **(O)** | `traceback_frame_limit` | `int` | Max traceback frame entries. Default: `5`, max: `10000`. |
         | **(O)** | `cause_limit` | `int` | Max chained cause entries. Default: `5`, max: `10000`. |
 
@@ -555,12 +781,14 @@ class ExceptionTracker():
 
         ### Warning
         > **Security:**
-        > - `user_input`, `params`, `local_variables`, `traceback`, and `system_info` may contain sensitive data.
+        > - `user_input`, `params`, and `local_variables` are stored as bounded snapshots rather than raw object references.
+        > - Snapshot metadata, `traceback`, and `system_info` may still contain sensitive data.
         > - Use `mask_presets=("private", "traceback", "system_info")` or explicit `mask_paths` before exposing error information outside a trusted boundary.
 
         ### Note
         > - This is the debug-heavy path for internal diagnostics.
         > - For safe external payloads, use `get_public_exception_info()` instead.
+        > - Context snapshots preserve small primitives directly and summarize large or custom objects with type, length, preview, and truncation metadata.
         > - `mask_paths` accepts a single dot path such as `"location.origin"`.
         > - `mask_paths` accepts a single tuple path such as `("location", "origin")`.
         > - Use a list for multiple paths, such as `["id", "quick_info", ("error", "message")]`.
@@ -605,10 +833,10 @@ class ExceptionTracker():
             error_info["error"]["message"] = str(error)
             error_info["location"]["entry"] = self._frame_to_location(entry_frame)
             error_info["location"]["origin"] = origin_location
-            error_info["input_context"]["user_input"] = user_input
-            error_info["input_context"]["params"]["args"] = args
-            error_info["input_context"]["params"]["kwargs"] = kwargs
-            error_info["input_context"]["local_variables"] = self._get_local_variables(error)
+            error_info["input_context"]["user_input"] = self._snapshot_context(user_input)
+            error_info["input_context"]["params"]["args"] = self._snapshot_context(args)
+            error_info["input_context"]["params"]["kwargs"] = self._snapshot_context(kwargs)
+            error_info["input_context"]["local_variables"] = self._snapshot_context(self._get_local_variables(error))
             error_info["causes"] = self._get_exception_causes(error, cause_limit)
             error_info["traceback"] = ''.join(traceback.format_exception(type(error), error, error.__traceback__))
             error_info["traceback_frames"] = [
@@ -627,7 +855,15 @@ class ExceptionTracker():
             tb_str = ''.join(traceback.format_exception(type(e), e, e.__traceback__))
             return Result(ResultStatus.FAILURE, f"{type(e).__name__} :{str(e)}", "Core.ExceptionTracker.get_exception_info, L1", tb_str)
 
-    def get_public_exception_info(self, error: Exception, error_code: Any=None, public_message: Optional[str]=None, public_context: Optional[str]=None, tags: Optional[Dict[str, Any]]=None, retryable: Optional[bool]=None) -> Result:
+    def get_public_exception_info(
+        self,
+        error: Exception,
+        error_code: Optional[PublicErrorCode]=None,
+        public_message: Optional[str]=None,
+        public_context: Optional[str]=None,
+        tags: Optional[PublicTags]=None,
+        retryable: Optional[bool]=None
+    ) -> Result:
         """
         Build lightweight public exception information safe to expose externally.
 
@@ -635,10 +871,10 @@ class ExceptionTracker():
         | Tag | Name | Type | Description |
         |-----|------|------|-------------|
         | **(R)** | `error` | `Exception` | The exception object that triggered the failure. |
-        | **(O)** | `error_code` | `Any` | Public-facing error code. Default: `"UNEXPECTED_ERROR"`. |
+        | **(O)** | `error_code` | `Optional[PublicErrorCode]` | Public-facing error code. Default: `"UNEXPECTED_ERROR"`. |
         | **(O)** | `public_message` | `Optional[str]` | Public-facing error message. Default: generic safe message. |
         | **(O)** | `public_context` | `Optional[str]` | Public-facing context string for the returned `Result`. Default: `None`. |
-        | **(O)** | `tags` | `Optional[Dict[str, Any]]` | Public metadata tags to attach to the payload. Default: `None`. |
+        | **(O)** | `tags` | `Optional[PublicTags]` | Public metadata tags to attach to the payload. Default: `None`. |
         | **(O)** | `retryable` | `Optional[bool]` | Whether the caller may retry the operation. Default: `None`. |
 
         ### Returns
@@ -680,7 +916,14 @@ class ExceptionTracker():
             return Result(ResultStatus.FAILURE, fallback_error_info["error"]["message"], normalized_context, fallback_error_info)
 
     # L2 Methods
-    def get_exception_return(self, error: Exception, user_input: Any=None, params: Tuple[Tuple, dict]=((), {}), mask_presets: Any=DEFAULT_MASK_PRESETS, mask_paths: Any=()) -> Result:
+    def get_exception_return(
+        self,
+        error: Exception,
+        user_input: object=None,
+        params: ExceptionParams=((), {}),
+        mask_presets: MaskPresetsInput=DEFAULT_MASK_PRESETS,
+        mask_paths: MaskPathsInput=()
+    ) -> Result:
         """
         Build a standardized debug-heavy failure `Result` from an exception.
 
@@ -688,10 +931,10 @@ class ExceptionTracker():
         | Tag | Name | Type | Description |
         |-----|------|------|-------------|
         | **(R)** | `error` | `Exception` | The exception object to track. |
-        | **(O)** | `user_input` | `Any` | User input context. Default: `None`. |
-        | **(O)** | `params` | `Tuple[Tuple, dict]` | Additional call context `(args, kwargs)`. Default: `((), {})`. |
-        | **(O)** | `mask_presets` | `Any` | Named mask presets. Default: `("default",)`. |
-        | **(O)** | `mask_paths` | `Any` | Extra paths to mask, such as `"id"`, `"location.origin"`, or `("error", "message")`. |
+        | **(O)** | `user_input` | `object` | User input context. Stored as a bounded snapshot. Default: `None`. |
+        | **(O)** | `params` | `ExceptionParams` | Additional call context `(args, kwargs)`. Stored as bounded snapshots. Default: `((), {})`. |
+        | **(O)** | `mask_presets` | `MaskPresetsInput` | Named mask presets. Default: `("default",)`. |
+        | **(O)** | `mask_paths` | `MaskPathsInput` | Extra paths to mask, such as `"id"`, `"location.origin"`, or `("error", "message")`. |
 
         ### Enum
         > `mask_presets` — type: `str`
@@ -709,7 +952,7 @@ class ExceptionTracker():
 
         ### Warning
         > **Security:**
-        > - The returned error information may contain sensitive data unless suitable `mask_presets` or `mask_paths` are used.
+        > - The returned error information uses bounded context snapshots but may still contain sensitive metadata unless suitable `mask_presets` or `mask_paths` are used.
 
         ### Note
         > - This method keeps the existing debug-oriented payload behavior.
@@ -730,7 +973,15 @@ class ExceptionTracker():
             tb_str = ''.join(traceback.format_exception(type(e), e, e.__traceback__))
             return Result(ResultStatus.FAILURE, f"{type(e).__name__} :{str(e)}", "Core.ExceptionTracker.get_exception_return, L2", tb_str)
 
-    def get_public_exception_return(self, error: Exception, error_code: Any=None, public_message: Optional[str]=None, public_context: Optional[str]=None, tags: Optional[Dict[str, Any]]=None, retryable: Optional[bool]=None) -> Result:
+    def get_public_exception_return(
+        self,
+        error: Exception,
+        error_code: Optional[PublicErrorCode]=None,
+        public_message: Optional[str]=None,
+        public_context: Optional[str]=None,
+        tags: Optional[PublicTags]=None,
+        retryable: Optional[bool]=None
+    ) -> Result:
         """
         Build a standardized public-safe failure `Result` from an exception.
 
@@ -738,10 +989,10 @@ class ExceptionTracker():
         | Tag | Name | Type | Description |
         |-----|------|------|-------------|
         | **(R)** | `error` | `Exception` | The exception object that triggered the failure. |
-        | **(O)** | `error_code` | `Any` | Public-facing error code. Default: `"UNEXPECTED_ERROR"`. |
+        | **(O)** | `error_code` | `Optional[PublicErrorCode]` | Public-facing error code. Default: `"UNEXPECTED_ERROR"`. |
         | **(O)** | `public_message` | `Optional[str]` | Public-facing error message. Default: generic safe message. |
         | **(O)** | `public_context` | `Optional[str]` | Public-facing context string for the returned `Result`. Default: `None`. |
-        | **(O)** | `tags` | `Optional[Dict[str, Any]]` | Public metadata tags to attach to the payload. Default: `None`. |
+        | **(O)** | `tags` | `Optional[PublicTags]` | Public metadata tags to attach to the payload. Default: `None`. |
         | **(O)** | `retryable` | `Optional[bool]` | Whether the caller may retry the operation. Default: `None`. |
 
         ### Returns
@@ -772,14 +1023,14 @@ class ExceptionTracker():
             retryable=retryable,
         )
 
-    def get_error_code(self, error_id_map: dict, error: Exception) -> Result:
+    def get_error_code(self, error_id_map: Mapping[str, object], error: Exception) -> Result:
         """
         Return a user-defined error code for a given exception type.
 
         ### Arguments
         | Tag | Name | Type | Description |
         |-----|------|------|-------------|
-        | **(R)** | `error_id_map` | `dict` | A dictionary mapping exception type names (`str`) to error codes (`Any`). |
+        | **(R)** | `error_id_map` | `Mapping[str, object]` | A mapping from exception type names to project-defined error codes. |
         | **(R)** | `error` | `Exception` | The exception object to get the error code for. |
 
         ### Constraint
@@ -819,8 +1070,8 @@ class ExceptionTrackerDecorator():
     ### Arguments
     | Tag | Name | Type | Description |
     |-----|------|------|-------------|
-    | **(O)** | `mask_presets` | `Any` | Named mask presets. Default: `("default",)`. |
-    | **(O)** | `mask_paths` | `Any` | Extra paths to mask, such as `"id"`, `"location.origin"`, or `("error", "message")`. |
+    | **(O)** | `mask_presets` | `MaskPresetsInput` | Named mask presets. Default: `("default",)`. |
+    | **(O)** | `mask_paths` | `MaskPathsInput` | Extra paths to mask, such as `"id"`, `"location.origin"`, or `("error", "message")`. |
     | **(O)** | `tracker` | `Optional[ExceptionTracker]` | Reused tracker. Default: `None`; creates a new `ExceptionTracker` when omitted. |
 
     ### Enum
@@ -835,7 +1086,7 @@ class ExceptionTrackerDecorator():
     > | `'system_info'` | Masks `system_info`. |
 
     ### Returns
-    `Callable[..., Union[Any, Result]]` — Wrapped function returning result or fallback on error.
+    `Callable[P, Union[R, Result]]` — Wrapped function returning the original result or a failure `Result` on error.
 
     ### Note
     > - Converts uncaught exceptions into standardized `Result` objects.
@@ -858,17 +1109,22 @@ class ExceptionTrackerDecorator():
     >>> result = risky_function(10, y=0)
     >>> print(result.status)
     """
-    def __init__(self, mask_presets: Any=ExceptionTracker.DEFAULT_MASK_PRESETS, mask_paths: Any=(), tracker: Optional[ExceptionTracker]=None):
+    def __init__(self, mask_presets: MaskPresetsInput=ExceptionTracker.DEFAULT_MASK_PRESETS, mask_paths: MaskPathsInput=(), tracker: Optional[ExceptionTracker]=None):
         self.tracker = tracker or ExceptionTracker()
         self.mask_presets = ExceptionTracker._normalize_mask_presets(mask_presets)
         self.mask_paths = ExceptionTracker._normalize_mask_paths(mask_paths)
 
-    def __call__(self, func: Callable[..., Any]) -> Callable[..., Union[Any, Result]]:
+    def __call__(self, func: Callable[P, R]) -> Callable[P, Union[R, Result]]:
         @wraps(func)
-        def wrapper(*args, **kwargs) -> Union[Any, Result]:
+        def wrapper(*args: P.args, **kwargs: P.kwargs) -> Union[R, Result]:
             try:
                 return func(*args, **kwargs)
             except Exception as e:
                 # Use the tracker to get standardized exception return
-                return self.tracker.get_exception_return(error=e, params=(args, kwargs), mask_presets=self.mask_presets, mask_paths=self.mask_paths)
+                return self.tracker.get_exception_return(
+                    error=e,
+                    params=(cast(Tuple[object, ...], args), cast(Mapping[str, object], kwargs)),
+                    mask_presets=self.mask_presets,
+                    mask_paths=self.mask_paths
+                )
         return wrapper

@@ -1,4 +1,4 @@
-[English](../../en/FOR_LLM/DOCUMENTATION_CONTRACT.md)
+[English](../../en/llm/documentation-contract.md)
 
 > Contract revision: 2026-06-23.
 
@@ -8,7 +8,7 @@
 
 ## 먼저 읽을 것
 
-반드시 [../FOR_HUMAN/DOCUMENTATION_CONTRACT.md](../FOR_HUMAN/DOCUMENTATION_CONTRACT.md)를 먼저 읽는다.
+반드시 [../human/documentation-contract.md](../human/documentation-contract.md)를 먼저 읽는다.
 
 - 사람용 문서가 정본이다.
 - 이 문서는 실행용 보조 지시서다.
@@ -107,8 +107,8 @@
 ## 붙여넣기용 프롬프트
 
 ```text
-먼저 docs/CONTRACT/ko/FOR_HUMAN/DOCUMENTATION_CONTRACT.md를 읽고,
-그 다음 docs/CONTRACT/ko/FOR_LLM/DOCUMENTATION_CONTRACT.md를 실행 지시서로 사용해서
+먼저 docs/contracts/ko/human/documentation-contract.md를 읽고,
+그 다음 docs/contracts/ko/llm/documentation-contract.md를 실행 지시서로 사용해서
 방금 준 Markdown 문서를 작성하거나 수정해줘.
 문서 유형을 유지하고, 저장소에서 확인 가능한 사실만 남기고,
 README, Guide, Reference라면 상단 메타를 언어 링크 -> 기준 정보 -> 제목 순서로 두고,

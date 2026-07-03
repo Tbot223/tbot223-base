@@ -1,4 +1,4 @@
-[한국어 (Korean)](../../ko/FOR_LLM/DOCSTRING_CONTRACT.md)
+[한국어 (Korean)](../../ko/llm/docstring-contract.md)
 
 > Contract revision: 2026-06-23.
 
@@ -8,9 +8,9 @@
 
 ## Read First
 
-Before reading this file, you MUST first read [../FOR_HUMAN/DOCSTRING_CONTRACT.md](../FOR_HUMAN/DOCSTRING_CONTRACT.md).
+Before reading this file, you MUST first read [../human/docstring-contract.md](../human/docstring-contract.md).
 
-- The `FOR_HUMAN` document is the canonical contract.
+- The human-facing document is the canonical contract.
 - This document does not summarize or replace the canonical one.
 - If a conflict arises while writing, the human-facing canonical document wins.
 
@@ -23,7 +23,7 @@ Before reading this file, you MUST first read [../FOR_HUMAN/DOCSTRING_CONTRACT.m
 
 ## Reading Procedure
 
-1. First, read [../FOR_HUMAN/DOCSTRING_CONTRACT.md](../FOR_HUMAN/DOCSTRING_CONTRACT.md) to the end.
+1. First, read [../human/docstring-contract.md](../human/docstring-contract.md) to the end.
 2. Understand the rendering target, scope, section structure, and expression rules.
 3. Then read this document and confirm what to extract from the actual code.
 4. If a conflict arises while writing, fall back to the human-facing canonical document.
@@ -203,8 +203,8 @@ Special forms map onto existing sections instead of adding new ones.
 ## Paste Prompt
 
 ```text
-First read docs/CONTRACT/en/FOR_HUMAN/DOCSTRING_CONTRACT.md to learn the contract, then
-use docs/CONTRACT/en/FOR_LLM/DOCSTRING_CONTRACT.md as the working instruction to write the docstring for the code I just gave you.
+First read docs/contracts/en/human/docstring-contract.md to learn the contract, then
+use docs/contracts/en/llm/docstring-contract.md as the working instruction to write the docstring for the code I just gave you.
 Keep the Markdown-heavy format but assume the Markdown-rendering IDE hover/peek as the primary consumer,
 treat public APIs and important internal methods as full-docstring targets,
 analyze the code's if statements, raises, and failure returns to write Constraint only with the allowed formal patterns,

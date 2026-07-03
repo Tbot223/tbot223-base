@@ -10,19 +10,19 @@
 
 ### 일반 문서 계약
 
-- [FOR_HUMAN/DOCUMENTATION_CONTRACT.md](FOR_HUMAN/DOCUMENTATION_CONTRACT.md): 저장소 Markdown 문서용 정본 계약이다.
-- [FOR_LLM/DOCUMENTATION_CONTRACT.md](FOR_LLM/DOCUMENTATION_CONTRACT.md): AI가 일반 문서를 작성하거나 수정할 때 따르는 실행 지시서다.
+- [human/documentation-contract.md](human/documentation-contract.md): 저장소 Markdown 문서용 정본 계약이다.
+- [llm/documentation-contract.md](llm/documentation-contract.md): AI가 일반 문서를 작성하거나 수정할 때 따르는 실행 지시서다.
 
 ### 독스트링 계약
 
-- [FOR_HUMAN/DOCSTRING_CONTRACT.md](FOR_HUMAN/DOCSTRING_CONTRACT.md): Python docstring용 정본 계약이다.
-- [FOR_LLM/DOCSTRING_CONTRACT.md](FOR_LLM/DOCSTRING_CONTRACT.md): AI가 docstring을 작성하거나 수정할 때 따르는 실행 지시서다.
+- [human/docstring-contract.md](human/docstring-contract.md): Python docstring용 정본 계약이다.
+- [llm/docstring-contract.md](llm/docstring-contract.md): AI가 docstring을 작성하거나 수정할 때 따르는 실행 지시서다.
 
 ## 권장 사용 방식
 
 - README, 가이드, 레퍼런스, 릴리스 노트, 계약 문서를 다룰 때는 일반 문서 계약부터 본다.
 - Python docstring을 다룰 때는 독스트링 계약부터 본다.
-- AI 작업에서는 해당 종류의 `FOR_HUMAN`을 먼저 읽고 `FOR_LLM`을 나중에 작업 지시서로 준다.
+- AI 작업에서는 해당 종류의 사람용 계약을 먼저 읽고 LLM 실행 지시서를 나중에 작업 지시서로 준다.
 
 ## 저장소 결정 사항
 
@@ -34,5 +34,5 @@
 ## 경로 정책
 
 - 이 README를 계약 진입점으로 사용한다.
-- 기존 경로 [../../DOCSTRING_CONTRACT.md](../../DOCSTRING_CONTRACT.md)는 호환성용 안내 문서로 유지한다.
+- 정본 계약 문서는 이 lowercase path tree 아래에 둔다.
 - 실제 계약 문서는 이 디렉토리 트리 아래를 기준으로 본다.
