@@ -4,7 +4,7 @@
 
 # ExceptionTracker Reference
 
-This reference covers `ExceptionTracker`, `ExceptionTrackerDecorator`, masking, and bounded context snapshots.
+This reference covers `ExceptionTracker`, `ExceptionTrackerDecorator`, masking, and safe context capture.
 
 ## Two Payload Paths
 
@@ -15,19 +15,22 @@ This reference covers `ExceptionTracker`, `ExceptionTrackerDecorator`, masking, 
 
 The public-safe path does not collect traceback text, local variables, params, or system information.
 
-## Debug Context Snapshot
+## Debug Context Capture
 
-The debug path stores `user_input`, `params.args`, `params.kwargs`, and origin-frame `local_variables` as bounded snapshots rather than raw object references.
+The debug path stores `user_input`, `params.args`, `params.kwargs`, and origin-frame `local_variables` as safe copies rather than raw object references.
 
-Default snapshot limits:
+Default context limits:
 
 | Constant | Value |
 | --- | --- |
-| `CONTEXT_MAX_REPR_LENGTH` | `200` |
+| `CONTEXT_MAX_VALUE_LENGTH` | `200` |
 | `CONTEXT_MAX_ITEMS` | `20` |
-| `CONTEXT_MAX_DEPTH` | `2` |
 
-Small primitives are kept directly. Long strings, bytes-like values, collections, and custom objects are summarized with metadata such as `type`, `length`, `preview`, `repr`, `shape`, and `truncated`.
+Small primitives and primitive-only `list`/`tuple` values are copied. Top-level `dict` values are copied only when they fit the item limit. Deep, bytes-like, or custom object values are replaced with `"<BLOCKED>"` instead of metadata summaries.
+
+## System Info
+
+Debug payloads include system information for internal diagnostics. Environment variables are copied only when the key is a small string and the value is a small primitive or shallow tuple/list of small primitives; collection stops at `ENVIRONMENT_VARIABLE_MAX_COUNT` entries. Small environment values can still be sensitive, so mask `system_info` before exposing debug payloads outside a trusted boundary.
 
 ## Mask Presets
 

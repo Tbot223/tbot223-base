@@ -13,7 +13,7 @@
 
 ### Changed
 
-- Debug exception context now stores bounded snapshots instead of raw object references.
+- Debug exception context now stores only small safe copies and replaces heavy values with `"<BLOCKED>"`.
 - Documentation paths are being normalized around lowercase canonical paths under `docs/contracts`, `docs/en`, and `docs/ko`.
 
 ### Notes

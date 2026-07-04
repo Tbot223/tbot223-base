@@ -20,16 +20,18 @@ This reference covers `ResultStatus`, `Result`, and `ResultUnwrapException`.
 
 ## Result
 
-`Result` is an immutable tuple-like container with these fields.
+`Result[T]` is an immutable tuple-like container with these fields.
 
 | Field | Type | Meaning |
 | --- | --- | --- |
 | `status` | `ResultStatus` | The normalized operation state. |
 | `error` | `Optional[str]` | Human-readable error text. |
 | `context` | `Optional[str]` | Operation context. |
-| `data` | `Any` | Payload returned by the operation. |
+| `data` | `T` | Payload returned by the operation. |
 
 The legacy `success=` constructor argument is still supported. New code should prefer `status=ResultStatus...`.
+
+Use `Result[T]` when the payload type is known. `unwrap()` and `expect()` return `T`, and `unwrap_or(default)` returns either `T` or the default value type.
 
 ## Predicates
 
@@ -40,16 +42,16 @@ The legacy `success=` constructor argument is still supported. New code should p
 
 ## Unwrap Helpers
 
-- `unwrap()`: returns `data` for success; raises `ResultUnwrapException` otherwise.
-- `expect(msg="")`: returns `data` for success; raises with a custom message otherwise.
-- `unwrap_or(default)`: returns `data` for success; otherwise returns `default`.
+- `unwrap()`: returns `T` for success; raises `ResultUnwrapException` otherwise.
+- `expect(msg="")`: returns `T` for success; raises with a custom message otherwise.
+- `unwrap_or(default)`: returns `T` for success; otherwise returns `default`.
 
 ## Example
 
 ```python
 from tbot223_base.tbot223_Result import Result, ResultStatus
 
-result = Result(ResultStatus.FAILURE, "not found", "LoadProfile", None)
+result: Result[dict[str, str]] = Result(ResultStatus.FAILURE, "not found", "LoadProfile", None)
 
 if result.is_failure:
     fallback = result.unwrap_or({"name": "anonymous"})

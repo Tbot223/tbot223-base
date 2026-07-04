@@ -4,7 +4,7 @@
 
 # ExceptionTracker 레퍼런스
 
-이 문서는 `ExceptionTracker`, `ExceptionTrackerDecorator`, masking, bounded context snapshot 정책을 설명한다.
+이 문서는 `ExceptionTracker`, `ExceptionTrackerDecorator`, masking, safe context capture 정책을 설명한다.
 
 ## 두 가지 payload 경로
 
@@ -15,19 +15,22 @@
 
 Public-safe 경로는 traceback text, local variables, params, system information을 수집하지 않는다.
 
-## Debug context snapshot
+## Debug context capture
 
-Debug 경로는 `user_input`, `params.args`, `params.kwargs`, origin frame의 `local_variables`를 raw object reference가 아니라 제한된 snapshot으로 저장한다.
+Debug 경로는 `user_input`, `params.args`, `params.kwargs`, origin frame의 `local_variables`를 raw object reference가 아니라 안전한 복사본으로 저장한다.
 
-기본 snapshot 제한값:
+기본 context 제한값:
 
 | Constant | Value |
 | --- | --- |
-| `CONTEXT_MAX_REPR_LENGTH` | `200` |
+| `CONTEXT_MAX_VALUE_LENGTH` | `200` |
 | `CONTEXT_MAX_ITEMS` | `20` |
-| `CONTEXT_MAX_DEPTH` | `2` |
 
-작은 primitive는 직접 보존한다. 긴 문자열, bytes-like 값, collection, custom object는 `type`, `length`, `preview`, `repr`, `shape`, `truncated` 같은 metadata로 요약한다.
+작은 primitive와 primitive-only `list`/`tuple` 값만 복사한다. Top-level `dict` 값은 item 제한을 만족할 때만 복사한다. 깊은 nested 값, bytes-like 값, custom object는 metadata로 요약하지 않고 `"<BLOCKED>"`로 대체한다.
+
+## System info
+
+Debug payload는 내부 진단용 system information을 포함한다. 환경변수는 key가 작은 문자열이고 value가 작은 primitive 또는 작은 primitive만 담은 얕은 tuple/list일 때만 복사하며, `ENVIRONMENT_VARIABLE_MAX_COUNT`개에서 수집을 멈춘다. 작은 환경변수 값도 민감할 수 있으므로 trusted boundary 밖으로 debug payload를 보낼 때는 `system_info`를 mask해야 한다.
 
 ## Mask preset
 

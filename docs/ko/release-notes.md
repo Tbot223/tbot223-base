@@ -13,7 +13,7 @@
 
 ### Changed
 
-- Debug exception context가 raw object reference 대신 제한된 snapshot을 저장한다.
+- Debug exception context가 raw object reference 대신 작은 safe copy만 저장하고 무거운 값은 `"<BLOCKED>"`로 대체한다.
 - 문서 경로를 `docs/contracts`, `docs/en`, `docs/ko` 아래 lowercase canonical path 중심으로 정리한다.
 
 ### Notes

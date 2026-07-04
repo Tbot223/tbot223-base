@@ -1,11 +1,12 @@
 # external modules
-from collections import namedtuple
 from enum import Enum
-from typing import Any, Optional, Union
+from typing import Generic, NamedTuple, Optional, TypeVar, Union, cast
 
 # internal modules
 
 _RESULT_SENTINEL = object()
+_DataT = TypeVar("_DataT")
+_DefaultT = TypeVar("_DefaultT")
 
 
 class ResultStatus(str, Enum):
@@ -18,7 +19,7 @@ class ResultStatus(str, Enum):
     CANCELLED = "cancelled"
 
     @classmethod
-    def normalize(cls, value: Union["ResultStatus", bool, None, str, object]) -> "ResultStatus":
+    def normalize(cls, value: object) -> "ResultStatus":
         """
         Normalize legacy and string input into a `ResultStatus`.
         """
@@ -45,7 +46,7 @@ class ResultUnwrapException(RuntimeError):
     Raised when `unwrap()` or `expect()` is called on a `Result` that does not represent success.
     """
 
-    def __init__(self, error, context, data):
+    def __init__(self, error: Optional[str], context: Optional[str], data: object) -> None:
         """
         Initialize the exception with the details stored in the `Result`.
 
@@ -54,7 +55,7 @@ class ResultUnwrapException(RuntimeError):
         |-----|------|------|-------------|
         | **(R)** | `error` | `Optional[str]` | Error message associated with the failed result. |
         | **(R)** | `context` | `Optional[str]` | Additional context attached to the result. |
-        | **(R)** | `data` | `Any` | Payload stored in the result. |
+        | **(R)** | `data` | `object` | Payload stored in the result. |
 
         ### Returns
         `None` — Initializes the exception object.
@@ -73,14 +74,18 @@ class ResultUnwrapException(RuntimeError):
         self.data = data
 
 
-_ResultBase = namedtuple("_ResultBase", "status error context data")
+class _ResultBase(NamedTuple, Generic[_DataT]):
+    status: ResultStatus
+    error: Optional[str]
+    context: Optional[str]
+    data: _DataT
 
 
-class Result(_ResultBase):
+class Result(_ResultBase[_DataT], Generic[_DataT]):
     """
     Immutable tuple-like container that represents the outcome of an operation.
 
-    `Result` stores an explicit `status` based on `ResultStatus`, so success,
+    `Result[_DataT]` stores an explicit `status` based on `ResultStatus`, so success,
     failure, and cancelled states are modeled directly instead of sharing one
     `Optional[bool]` field. For compatibility, `success=` input and the
     `result.success` property are still supported.
@@ -95,17 +100,19 @@ class Result(_ResultBase):
     | **(R)** | `status` | `ResultStatus` | Overall outcome. Use `SUCCESS`, `FAILURE`, or `CANCELLED`. |
     | **(R)** | `error` | `Optional[str]` | Human-readable error message. |
     | **(R)** | `context` | `Optional[str]` | Additional context about the operation. |
-    | **(R)** | `data` | `Any` | Data returned from the operation. |
+    | **(R)** | `data` | `_DataT` | Data returned from the operation. |
 
     ### Note
+    > - Use `Result[T]` when the payload type is known.
     > - `unwrap()`, `expect()`, and `unwrap_or()` are convenience methods.
+    > - `unwrap()` and `expect()` return `_DataT`.
     > - `success=` remains supported for legacy calls and is normalized into `status`.
     > - `result.success` remains available as a compatibility property that returns `True`, `False`, or `None`.
     > - In most code, directly checking `status`, `error`, and `data` is recommended.
 
     ### Example
     >>> from tbot223_base.tbot223_Result import Result, ResultStatus
-    >>> result = Result(status=ResultStatus.SUCCESS, error=None, context="FetchData", data={"key": "value"})
+    >>> result: Result[dict[str, str]] = Result(status=ResultStatus.SUCCESS, error=None, context="FetchData", data={"key": "value"})
     >>> if result.is_success:
     >>>     print("Operation succeeded with data:", result.data)
     """
@@ -113,14 +120,14 @@ class Result(_ResultBase):
     __slots__ = ()
 
     def __new__(
-        cls,
-        status: Union[ResultStatus, bool, None, str, object] = _RESULT_SENTINEL,
+        cls: type["Result[_DataT]"],
+        status: object = _RESULT_SENTINEL,
         error: Optional[str] = None,
         context: Optional[str] = None,
-        data: Any = None,
+        data: _DataT = cast(_DataT, None),
         *,
-        success: Union[bool, None, object] = _RESULT_SENTINEL,
-    ):
+        success: object = _RESULT_SENTINEL,
+    ) -> "Result[_DataT]":
         if success is not _RESULT_SENTINEL:
             if status is not _RESULT_SENTINEL:
                 raise TypeError("Use either `status` or legacy `success`, not both.")
@@ -130,7 +137,7 @@ class Result(_ResultBase):
             raise TypeError("Missing required argument: `status`.")
 
         normalized_status = ResultStatus.normalize(status)
-        return super().__new__(cls, normalized_status, error, context, data)
+        return cast("Result[_DataT]", tuple.__new__(cls, (normalized_status, error, context, data)))
 
     @property
     def success(self) -> Optional[bool]:
@@ -164,7 +171,7 @@ class Result(_ResultBase):
         """
         return self.status is ResultStatus.CANCELLED
 
-    def unwrap(self) -> Any:
+    def unwrap(self) -> _DataT:
         """
         Return the contained `data` if the result is successful.
 
@@ -175,11 +182,11 @@ class Result(_ResultBase):
         > - `self.status` MUST be `ResultStatus.SUCCESS`.
 
         ### Returns
-        `Any` — The stored payload.
+        `_DataT` — The stored payload.
 
         ### Example
         >>> from tbot223_base.tbot223_Result import Result, ResultStatus
-        >>> result = Result(status=ResultStatus.SUCCESS, error=None, context="FetchData", data={"key": "value"})
+        >>> result: Result[dict[str, str]] = Result(status=ResultStatus.SUCCESS, error=None, context="FetchData", data={"key": "value"})
         >>> data = result.unwrap()
         >>> print(data)
         """
@@ -189,7 +196,7 @@ class Result(_ResultBase):
             raise ResultUnwrapException(self.error, self.context, self.data)
         raise ResultUnwrapException("Operation was cancelled or not executed.", self.context, self.data)
 
-    def expect(self, msg: str = "") -> Any:
+    def expect(self, msg: str = "") -> _DataT:
         """
         Return the contained `data` if the result is successful.
 
@@ -202,11 +209,11 @@ class Result(_ResultBase):
         > - `self.status` MUST be `ResultStatus.SUCCESS`.
 
         ### Returns
-        `Any` — The stored payload.
+        `_DataT` — The stored payload.
 
         ### Example
         >>> from tbot223_base.tbot223_Result import Result, ResultStatus
-        >>> result = Result(status=ResultStatus.SUCCESS, error=None, context="FetchData", data={"key": "value"})
+        >>> result: Result[dict[str, str]] = Result(status=ResultStatus.SUCCESS, error=None, context="FetchData", data={"key": "value"})
         >>> data = result.expect("Should not fail")
         >>> print(data)
         """
@@ -217,21 +224,21 @@ class Result(_ResultBase):
             error_message = "Operation was cancelled or not executed."
         raise ResultUnwrapException(error_message, self.context, self.data)
 
-    def unwrap_or(self, default: Any) -> Any:
+    def unwrap_or(self, default: _DefaultT) -> Union[_DataT, _DefaultT]:
         """
         Return the contained `data` if successful; otherwise return `default`.
 
         ### Arguments
         | Tag | Name | Type | Description |
         |-----|------|------|-------------|
-        | **(R)** | `default` | `Any` | Fallback value. |
+        | **(R)** | `default` | `_DefaultT` | Fallback value. |
 
         ### Returns
-        `Any` — The stored payload if successful, otherwise `default`.
+        `Union[_DataT, _DefaultT]` — The stored payload if successful, otherwise `default`.
 
         ### Example
         >>> from tbot223_base.tbot223_Result import Result, ResultStatus
-        >>> result = Result(status=ResultStatus.FAILURE, error="Not Found", context="FetchData", data=None)
+        >>> result: Result[dict[str, str]] = Result(status=ResultStatus.FAILURE, error="Not Found", context="FetchData", data=None)
         >>> data = result.unwrap_or({"key": "default_value"})
         >>> print(data)
         """

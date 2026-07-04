@@ -27,6 +27,17 @@ def test_result_accepts_status_and_legacy_success_inputs():
     assert legacy.success is False
 
 
+def test_result_supports_generic_runtime_subscription():
+    result = Result[int](ResultStatus.SUCCESS, None, "Typed", 123)
+
+    assert isinstance(result, Result)
+    assert result.data == 123
+    assert result.unwrap() == 123
+    assert result.expect() == 123
+    assert result.unwrap_or("fallback") == 123
+    assert Result.__parameters__
+
+
 def test_result_rejects_missing_or_conflicting_status_inputs():
     with pytest.raises(TypeError):
         Result()

@@ -21,7 +21,7 @@
 ```python
 from tbot223_base.tbot223_Result import Result, ResultStatus
 
-result = Result(
+result: Result[dict[str, int]] = Result(
     status=ResultStatus.SUCCESS,
     error=None,
     context="FetchProfile",

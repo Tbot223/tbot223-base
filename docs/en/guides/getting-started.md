@@ -17,7 +17,7 @@ This guide shows the smallest useful path for importing `tbot223-base` from a re
 ```python
 from tbot223_base.tbot223_Result import Result, ResultStatus
 
-result = Result(
+result: Result[dict[str, str]] = Result(
     status=ResultStatus.SUCCESS,
     error=None,
     context="LoadConfig",
@@ -70,7 +70,7 @@ except Exception as error:
     print(result.error)
 ```
 
-The debug path can include traceback and context metadata. Context values are stored as bounded snapshots rather than raw object references.
+The debug path can include traceback and context metadata. Context values are copied only when small and safe; heavy values are replaced with `"<BLOCKED>"`.
 
 ## Verify
 

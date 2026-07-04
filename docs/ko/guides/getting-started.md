@@ -17,7 +17,7 @@
 ```python
 from tbot223_base.tbot223_Result import Result, ResultStatus
 
-result = Result(
+result: Result[dict[str, str]] = Result(
     status=ResultStatus.SUCCESS,
     error=None,
     context="LoadConfig",
@@ -70,7 +70,7 @@ except Exception as error:
     print(result.error)
 ```
 
-Debug 경로는 traceback과 context metadata를 포함할 수 있다. Context 값은 raw object reference가 아니라 제한된 snapshot으로 저장된다.
+Debug 경로는 traceback과 context metadata를 포함할 수 있다. Context 값은 작고 안전할 때만 복사되며, 무거운 값은 `"<BLOCKED>"`로 대체된다.
 
 ## 확인
 

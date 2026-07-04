@@ -47,17 +47,17 @@
 full docstring의 구조적 바닥은 한 줄 요약, `Arguments`, `Returns` 세 가지다. 다른 섹션은 근거가 있을 때만 추가한다.
 
 ```python
-def unwrap_or(self, default: Any) -> Any:
+def unwrap_or(self, default: _DefaultT) -> Union[_DataT, _DefaultT]:
     """
     Return the contained `data` if successful; otherwise return `default`.
 
     ### Arguments
     | Tag | Name | Type | Description |
     |-----|------|------|-------------|
-    | **(R)** | `default` | `Any` | Fallback value used when the result is not successful. |
+    | **(R)** | `default` | `_DefaultT` | Fallback value used when the result is not successful. |
 
     ### Returns
-    `Any` — The stored payload if successful, otherwise `default`.
+    `Union[_DataT, _DefaultT]` — The stored payload if successful, otherwise `default`.
     """
 ```
 
@@ -341,17 +341,17 @@ Example은 `>>>` REPL 형식으로 작성한다.
 `tbot223_base`의 실제 `Result.unwrap_or`를 기준으로 한 기본형이다.
 
 ```python
-def unwrap_or(self, default: Any) -> Any:
+def unwrap_or(self, default: _DefaultT) -> Union[_DataT, _DefaultT]:
     """
     Return the contained `data` if successful; otherwise return `default`.
 
     ### Arguments
     | Tag | Name | Type | Description |
     |-----|------|------|-------------|
-    | **(R)** | `default` | `Any` | Fallback value used when the result is not successful. |
+    | **(R)** | `default` | `_DefaultT` | Fallback value used when the result is not successful. |
 
     ### Returns
-    `Any` — The stored payload if successful, otherwise `default`.
+    `Union[_DataT, _DefaultT]` — The stored payload if successful, otherwise `default`.
 
     ### Example
     >>> from tbot223_base.tbot223_Result import Result
@@ -380,8 +380,8 @@ def get_exception_info(
     | Tag | Name | Type | Description |
     |-----|------|------|-------------|
     | **(R)** | `error` | `Exception` | The exception object to describe. |
-    | **(O)** | `user_input` | `object` | User input context. Stored as a bounded snapshot. Default: `None`. |
-    | **(O)** | `params` | `ExceptionParams` | Additional call context `(args, kwargs)`. Stored as bounded snapshots. Default: `((), {})`. |
+    | **(O)** | `user_input` | `object` | User input context. Small safe values are copied; heavy values are blocked. Default: `None`. |
+    | **(O)** | `params` | `ExceptionParams` | Additional call context `(args, kwargs)`. Small safe values are copied; heavy values are blocked. Default: `((), {})`. |
     | **(O)** | `mask_presets` | `MaskPresetsInput` | Named mask presets. Default: `("default",)`. |
     | **(O)** | `mask_paths` | `MaskPathsInput` | Extra paths to mask. Default: `()`. |
 
@@ -401,12 +401,14 @@ def get_exception_info(
 
     ### Warning
     > **Security:**
-    > - `user_input`, `params`, and `local_variables` are stored as bounded snapshots rather than raw object references.
-    > - Snapshot metadata, `traceback`, and `system_info` may still contain sensitive data.
+    > - `user_input`, `params`, and `local_variables` never store raw object references.
+    > - Heavy or unsupported context values are replaced with `"<BLOCKED>"` rather than summarized with metadata.
+    > - Small copied context values, `traceback`, and `system_info` may still contain sensitive data.
+    > - Environment variables inside `system_info` are copied only when they are small primitives or shallow tuple/list values with small primitive items.
     > - Apply `mask_presets=("private", "traceback", "system_info")` before exposing error information outside a trusted boundary.
 
     ### Note
-    > Context snapshots preserve small primitives directly and summarize large or custom objects with type, length, preview, and truncation metadata.
+    > Context capture preserves small primitives and primitive-only `list`/`tuple` values; `dict` values are copied only at the top level.
     > Unknown preset names and invalid mask paths are ignored rather than rejected.
 
     ### Example
@@ -425,7 +427,7 @@ def get_exception_info(
 `tbot223_base`의 실제 `Result.unwrap`을 기준으로 한 예시다. `success`가 `True`가 아니면 실제로 `ResultUnwrapException`을 raise 하므로 Constraint와 Raises를 함께 적는다.
 
 ```python
-def unwrap(self) -> Any:
+def unwrap(self) -> _DataT:
     """
     Return the contained `data` when the result represents success.
 
@@ -433,13 +435,13 @@ def unwrap(self) -> Any:
     None
 
     ### Constraint
-    > - `self.success` MUST be `True`.
+    > - `self.status` MUST be `ResultStatus.SUCCESS`.
 
     ### Returns
-    `Any` — The stored payload.
+    `_DataT` — The stored payload.
 
     ### Raises
-    > - `ResultUnwrapException` — Raised when `success` is not `True`.
+    > - `ResultUnwrapException` — Raised when `status` is not `ResultStatus.SUCCESS`.
 
     ### Example
     >>> from tbot223_base.tbot223_Result import Result
@@ -525,7 +527,7 @@ def thread_pool_executor(
 ## 10. 특수 형태 처리
 
 대부분의 특수 형태는 새 섹션을 만들지 않고 기존 섹션을 재사용한다. 아래는 형태별 델타만 정리한 것이다.
-`Result`는 실제 `NamedTuple`이므로 dataclass / NamedTuple 행은 실제 코드 기준이며, async, 제너레이터, 컨텍스트 매니저 행은 베이스 패키지에 해당 코드가 없어 양식 설명용이다.
+`Result`는 generic tuple-like container이므로 dataclass / NamedTuple 행은 실제 필드 문서화 기준이며, async, 제너레이터, 컨텍스트 매니저 행은 베이스 패키지에 해당 코드가 없어 양식 설명용이다.
 
 | 형태 | 핵심 규칙 |
 |------|-----------|
@@ -555,14 +557,14 @@ def thread_pool_executor(
 
 ### dataclass / NamedTuple 필드 표기 예시
 
-`tbot223_base`의 실제 `Result`(`NamedTuple`) 필드 이름과 타입을 기준으로 한 클래스 레벨 필드 표다.
+`tbot223_base`의 실제 generic `Result` tuple-like 필드 이름과 타입을 기준으로 한 클래스 레벨 필드 표다.
 
 ```markdown
 ### Arguments
 | Tag | Name | Type | Description |
 |-----|------|------|-------------|
-| **(R)** | `success` | `bool` | Whether the operation succeeded. |
+| **(R)** | `status` | `ResultStatus` | Overall operation state. |
 | **(R)** | `error` | `Optional[str]` | Error label when not successful. |
-| **(R)** | `context` | `str` | Call-site context label. |
-| **(R)** | `data` | `Any` | Payload carried on the result. |
+| **(R)** | `context` | `Optional[str]` | Call-site context label. |
+| **(R)** | `data` | `_DataT` | Payload carried on the result. |
 ```

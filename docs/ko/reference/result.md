@@ -20,16 +20,18 @@
 
 ## Result
 
-`Result`는 immutable tuple-like container이며 다음 필드를 가진다.
+`Result[T]`는 immutable tuple-like container이며 다음 필드를 가진다.
 
 | Field | Type | Meaning |
 | --- | --- | --- |
 | `status` | `ResultStatus` | 정규화된 작업 상태. |
 | `error` | `Optional[str]` | 사람이 읽을 수 있는 에러 텍스트. |
 | `context` | `Optional[str]` | 작업 맥락. |
-| `data` | `Any` | 작업이 반환한 payload. |
+| `data` | `T` | 작업이 반환한 payload. |
 
 Legacy `success=` 생성자 인자는 계속 지원된다. 새 코드는 `status=ResultStatus...`를 우선 사용한다.
+
+Payload 타입을 알고 있다면 `Result[T]`를 사용한다. `unwrap()`과 `expect()`는 `T`를 반환하고, `unwrap_or(default)`는 `T` 또는 default 값 타입을 반환한다.
 
 ## Predicate
 
@@ -40,16 +42,16 @@ Legacy `success=` 생성자 인자는 계속 지원된다. 새 코드는 `status
 
 ## Unwrap helper
 
-- `unwrap()`: 성공이면 `data`를 반환하고, 아니면 `ResultUnwrapException`을 raise한다.
-- `expect(msg="")`: 성공이면 `data`를 반환하고, 아니면 custom message로 raise한다.
-- `unwrap_or(default)`: 성공이면 `data`, 아니면 `default`를 반환한다.
+- `unwrap()`: 성공이면 `T`를 반환하고, 아니면 `ResultUnwrapException`을 raise한다.
+- `expect(msg="")`: 성공이면 `T`를 반환하고, 아니면 custom message로 raise한다.
+- `unwrap_or(default)`: 성공이면 `T`, 아니면 `default`를 반환한다.
 
 ## Example
 
 ```python
 from tbot223_base.tbot223_Result import Result, ResultStatus
 
-result = Result(ResultStatus.FAILURE, "not found", "LoadProfile", None)
+result: Result[dict[str, str]] = Result(ResultStatus.FAILURE, "not found", "LoadProfile", None)
 
 if result.is_failure:
     fallback = result.unwrap_or({"name": "anonymous"})

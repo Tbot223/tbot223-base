@@ -13,7 +13,7 @@ English documentation for using `Result`, `ResultStatus`, and `ExceptionTracker`
 ## Reference
 
 - [Result Reference](reference/result.md): status model, legacy compatibility, and unwrap helpers.
-- [ExceptionTracker Reference](reference/exception-tracker.md): debug payloads, public payloads, masking, and context snapshots.
+- [ExceptionTracker Reference](reference/exception-tracker.md): debug payloads, public payloads, masking, and safe context capture.
 
 ## Release Notes
 

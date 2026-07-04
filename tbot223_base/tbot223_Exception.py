@@ -5,7 +5,7 @@ import platform
 import time
 import traceback
 import uuid
-from collections.abc import Iterable, Mapping, Sized
+from collections.abc import Iterable, Mapping
 from typing import Callable, Dict, List, Literal, Optional, ParamSpec, Tuple, TypeAlias, TypeGuard, TypeVar, Union, cast
 from functools import wraps
 import threading
@@ -20,6 +20,8 @@ MaskPathsInput: TypeAlias = Optional[Union[MaskPath, Iterable[MaskPath]]]
 ExceptionParams: TypeAlias = Tuple[Tuple[object, ...], Mapping[str, object]]
 PublicTags: TypeAlias = Mapping[object, object]
 PublicErrorCode: TypeAlias = Union[str, int]
+ContextSequence: TypeAlias = Union[List[object], Tuple[object, ...]]
+ContextMapping: TypeAlias = Dict[object, object]
 
 P = ParamSpec("P")
 R = TypeVar("R")
@@ -33,8 +35,64 @@ class ExceptionTrackerHelper():
     > - Used internally by `ExceptionTracker` for consistent data formatting.
     > - Not intended for direct use by external code.
     """
-    @staticmethod
-    def get_system_info() -> dict:
+    ENVIRONMENT_VARIABLE_MAX_VALUE_LENGTH = 200
+    ENVIRONMENT_VARIABLE_MAX_COUNT = 50
+
+    @classmethod
+    def _copy_small_environment_primitive(cls, value: object) -> Tuple[bool, object]:
+        """Return whether a value is a small primitive safe to copy."""
+        if value is None or isinstance(value, (bool, int, float)):
+            return True, value
+        if isinstance(value, str) and len(value) <= cls.ENVIRONMENT_VARIABLE_MAX_VALUE_LENGTH:
+            return True, value
+        return False, None
+
+    @classmethod
+    def _copy_small_environment_value(cls, value: object) -> Tuple[bool, object]:
+        """Return whether an environment value is safe to copy."""
+        is_small, copied_value = cls._copy_small_environment_primitive(value)
+        if is_small:
+            return True, copied_value
+
+        if not isinstance(value, (tuple, list)):
+            return False, None
+        if len(value) > cls.ENVIRONMENT_VARIABLE_MAX_COUNT:
+            return False, None
+
+        copied_items: List[object] = []
+        for item in value:
+            is_small_item, copied_item = cls._copy_small_environment_primitive(item)
+            if not is_small_item:
+                return False, None
+            copied_items.append(copied_item)
+
+        if isinstance(value, tuple):
+            return True, tuple(copied_items)
+        return True, copied_items
+
+    @classmethod
+    def _get_small_environment_variables(cls) -> Dict[str, object]:
+        """Return small environment variables without truncating or snapshotting large values."""
+        variables: Dict[str, object] = {}
+        environment = os.environ
+
+        if not isinstance(environment, Mapping):
+            return variables
+
+        for key, value in environment.items():
+            if not isinstance(key, str) or len(key) > cls.ENVIRONMENT_VARIABLE_MAX_VALUE_LENGTH:
+                continue
+            is_small, copied_value = cls._copy_small_environment_value(value)
+            if not is_small:
+                continue
+            variables[key] = copied_value
+            if len(variables) >= cls.ENVIRONMENT_VARIABLE_MAX_COUNT:
+                break
+
+        return variables
+
+    @classmethod
+    def get_system_info(cls) -> dict:
         """
         Return a system information snapshot.
 
@@ -42,11 +100,12 @@ class ExceptionTrackerHelper():
         None
 
         ### Returns
-        `dict` — Contains OS, Python, process, thread, path, and timestamp information.
+        `dict` — Contains OS, Python, process, thread, path, small environment variables, and timestamp information.
 
         ### Warning
         > **Security:**
-        > - The returned snapshot may include sensitive process context such as `Command_Args`, `Python_Path`, `Hostname`, and `Current_Working_Directory`.
+        > - The returned snapshot may include sensitive process context such as `Command_Args`, `Python_Path`, `Hostname`, `Current_Working_Directory`, and small environment variables.
+        > - Environment variables are only copied when they are small primitives or shallow tuple/list values with small primitive items, up to `ENVIRONMENT_VARIABLE_MAX_COUNT` entries.
         > - Mask or omit this payload before exposing it to untrusted users or external systems.
 
         ### Example
@@ -61,6 +120,8 @@ class ExceptionTrackerHelper():
                 cwd = "<Permission Denied or Unavailable>"
         except Exception:
             cwd = "<Permission Denied or Unavailable>"
+
+        environment_variables = cls._get_small_environment_variables()
 
         # This method can be expanded to include more dynamic system information if needed.
         return {
@@ -77,7 +138,12 @@ class ExceptionTrackerHelper():
             "Thread_Name": threading.current_thread().name,
 
             "Command_Args": sys.argv,
-            "Virtual_Env": os.getenv('VIRTUAL_ENV', 'None'),
+            "Virtual_Env": (
+                environment_variables["VIRTUAL_ENV"]
+                if isinstance(environment_variables.get("VIRTUAL_ENV"), str)
+                else "None"
+            ),
+            "Environment_Variables": environment_variables,
             "Python_Path": sys.path,
 
             "Timestamp": time.strftime("%Y-%m-%dT%H:%M:%SZ", time.gmtime())
@@ -188,14 +254,14 @@ class ExceptionTracker():
     """
 
     MASKED_VALUE = "<MASKED>"
+    BLOCKED_VALUE = "<BLOCKED>"
     DEFAULT_TRACEBACK_LIMIT = 5
     MAX_TRACEBACK_LIMIT = 10000
     DEFAULT_PUBLIC_ERROR_CODE = "UNEXPECTED_ERROR"
     DEFAULT_PUBLIC_MESSAGE = "The operation could not be completed."
     DEFAULT_MASK_PRESETS: Tuple[MaskPreset, ...] = ("default",)
-    CONTEXT_MAX_REPR_LENGTH = 200
+    CONTEXT_MAX_VALUE_LENGTH = 200
     CONTEXT_MAX_ITEMS = 20
-    CONTEXT_MAX_DEPTH = 2
     MASK_PRESETS: Dict[MaskPreset, Tuple[Tuple[str, ...], ...]] = {
         "default": (
             ("input_context", "local_variables"),
@@ -325,205 +391,89 @@ class ExceptionTracker():
         return dict(origin_tb.tb_frame.f_locals)
 
     @classmethod
-    def _get_type_name(cls, value: object) -> str:
-        value_type = type(value)
-        if value_type.__module__ == "builtins":
-            return value_type.__qualname__
-        return f"{value_type.__module__}.{value_type.__qualname__}"
-
-    @classmethod
-    def _safe_len(cls, value: object) -> Optional[int]:
-        if not isinstance(value, Sized):
-            return None
-        try:
-            return len(value)
-        except Exception:
-            return None
-
-    @classmethod
-    def _safe_shape(cls, value: object) -> Optional[object]:
-        try:
-            shape = getattr(value, "shape")
-        except Exception:
-            return None
-
-        if shape is None or isinstance(shape, (bool, int, float, str)):
-            return shape
-        if isinstance(shape, tuple):
-            return tuple(cls._snapshot_shape_part(part) for part in shape[:cls.CONTEXT_MAX_ITEMS])
-        if isinstance(shape, list):
-            return [cls._snapshot_shape_part(part) for part in shape[:cls.CONTEXT_MAX_ITEMS]]
-        return cls._get_type_name(shape)
-
-    @classmethod
-    def _snapshot_shape_part(cls, value: object) -> object:
-        if value is None or isinstance(value, (bool, int, float, str)):
-            return value
-        return cls._get_type_name(value)
-
-    @classmethod
-    def _safe_repr(cls, value: object) -> Tuple[str, bool]:
-        if type(value).__module__ == "builtins":
-            try:
-                representation = repr(value)
-            except Exception:
-                representation = object.__repr__(value)
-        else:
-            representation = object.__repr__(value)
-
-        if len(representation) > cls.CONTEXT_MAX_REPR_LENGTH:
-            return representation[:cls.CONTEXT_MAX_REPR_LENGTH], True
-        return representation, False
-
-    @classmethod
-    def _metadata_snapshot(cls, value: object, truncated: bool=False) -> Dict[str, object]:
-        if isinstance(value, (Mapping, list, tuple, set, frozenset)):
-            representation = f"<{cls._get_type_name(value)} snapshot omitted>"
-            repr_truncated = True
-        else:
-            representation, repr_truncated = cls._safe_repr(value)
-
-        snapshot: Dict[str, object] = {
-            "type": cls._get_type_name(value),
-            "repr": representation,
-            "truncated": truncated or repr_truncated,
-        }
-
-        length = cls._safe_len(value)
-        if length is not None:
-            snapshot["length"] = length
-
-        shape = cls._safe_shape(value)
-        if shape is not None:
-            snapshot["shape"] = shape
-
-        return snapshot
-
-    @classmethod
-    def _bytes_snapshot(cls, value: Union[bytes, bytearray, memoryview]) -> Dict[str, object]:
-        if isinstance(value, memoryview):
-            length = value.nbytes
-            try:
-                preview_value = value[:cls.CONTEXT_MAX_REPR_LENGTH].tobytes()
-            except Exception:
-                preview_value = b""
-        else:
-            length = cls._safe_len(value) or 0
-            preview_value = bytes(value[:cls.CONTEXT_MAX_REPR_LENGTH])
-
-        preview, repr_truncated = cls._safe_repr(preview_value)
-        return {
-            "type": cls._get_type_name(value),
-            "length": length,
-            "preview": preview,
-            "truncated": length > cls.CONTEXT_MAX_REPR_LENGTH or repr_truncated,
-        }
-
-    @classmethod
-    def _mapping_snapshot(cls, value: Mapping[object, object], depth: int, active_ids: set[int]) -> Dict[str, object]:
-        length = cls._safe_len(value)
-        items: Dict[str, object] = {}
-        entries: List[Dict[str, object]] = []
-        truncated = bool(length is not None and length > cls.CONTEXT_MAX_ITEMS)
-
-        try:
-            item_iterator = iter(value.items())
-            for index, (key, item) in enumerate(item_iterator):
-                if index >= cls.CONTEXT_MAX_ITEMS:
-                    truncated = True
-                    break
-
-                key_snapshot = cls._snapshot_context(key, depth + 1, active_ids)
-                value_snapshot = cls._snapshot_context(item, depth + 1, active_ids)
-
-                if isinstance(key_snapshot, str) and key_snapshot not in items:
-                    items[key_snapshot] = value_snapshot
-                else:
-                    entries.append({
-                        "key": key_snapshot,
-                        "value": value_snapshot,
-                    })
-        except Exception:
-            return cls._metadata_snapshot(value, truncated=True)
-
-        snapshot: Dict[str, object] = {
-            "type": cls._get_type_name(value),
-            "length": length,
-            "items": items,
-            "truncated": truncated,
-        }
-        if entries:
-            snapshot["entries"] = entries
-        return snapshot
-
-    @classmethod
-    def _sequence_snapshot(cls, value: Union[list, tuple, set, frozenset], depth: int, active_ids: set[int]) -> Dict[str, object]:
-        length = cls._safe_len(value)
-        items: List[object] = []
-        truncated = bool(length is not None and length > cls.CONTEXT_MAX_ITEMS)
-
-        try:
-            for index, item in enumerate(value):
-                if index >= cls.CONTEXT_MAX_ITEMS:
-                    truncated = True
-                    break
-                items.append(cls._snapshot_context(item, depth + 1, active_ids))
-        except Exception:
-            return cls._metadata_snapshot(value, truncated=True)
-
-        return {
-            "type": cls._get_type_name(value),
-            "length": length,
-            "items": items,
-            "truncated": truncated,
-        }
-
-    @classmethod
-    def _snapshot_context(cls, value: object, depth: int=0, active_ids: Optional[set[int]]=None) -> object:
+    def _copy_safe_context_primitive(cls, value: object) -> Tuple[bool, object]:
         if value is None or isinstance(value, (bool, int, float)):
-            return value
+            return True, value
 
-        if isinstance(value, str):
-            if len(value) <= cls.CONTEXT_MAX_REPR_LENGTH:
-                return value
-            return {
-                "type": "str",
-                "length": len(value),
-                "preview": value[:cls.CONTEXT_MAX_REPR_LENGTH],
-                "truncated": True,
-            }
+        if isinstance(value, str) and len(value) <= cls.CONTEXT_MAX_VALUE_LENGTH:
+            return True, value
 
-        if isinstance(value, (bytes, bytearray, memoryview)):
-            return cls._bytes_snapshot(value)
+        return False, cls.BLOCKED_VALUE
 
-        if active_ids is None:
-            active_ids = set()
+    @staticmethod
+    def _is_plain_context_sequence(value: object) -> TypeGuard[ContextSequence]:
+        return type(value) in (list, tuple)
 
-        value_id = id(value)
-        if value_id in active_ids:
-            return {
-                "type": cls._get_type_name(value),
-                "cycle": True,
-            }
+    @staticmethod
+    def _is_plain_context_mapping(value: object) -> TypeGuard[ContextMapping]:
+        return type(value) is dict
 
-        if depth >= cls.CONTEXT_MAX_DEPTH:
-            return cls._metadata_snapshot(value, truncated=True)
+    @classmethod
+    def _copy_safe_context_sequence(cls, value: ContextSequence) -> object:
+        if len(value) > cls.CONTEXT_MAX_ITEMS:
+            return cls.BLOCKED_VALUE
 
-        if isinstance(value, Mapping):
-            active_ids.add(value_id)
-            try:
-                return cls._mapping_snapshot(value, depth, active_ids)
-            finally:
-                active_ids.remove(value_id)
+        copied_items: List[object] = []
+        for item in value:
+            is_small, copied_item = cls._copy_safe_context_primitive(item)
+            if is_small:
+                copied_items.append(copied_item)
+            elif cls._is_plain_context_sequence(item):
+                copied_items.append(cls._copy_safe_context_inner_sequence(item))
+            else:
+                copied_items.append(cls.BLOCKED_VALUE)
 
-        if isinstance(value, (list, tuple, set, frozenset)):
-            active_ids.add(value_id)
-            try:
-                return cls._sequence_snapshot(value, depth, active_ids)
-            finally:
-                active_ids.remove(value_id)
+        if isinstance(value, tuple):
+            return tuple(copied_items)
+        return copied_items
 
-        return cls._metadata_snapshot(value)
+    @classmethod
+    def _copy_safe_context_inner_sequence(cls, value: ContextSequence) -> object:
+        if len(value) > cls.CONTEXT_MAX_ITEMS:
+            return cls.BLOCKED_VALUE
+
+        copied_items: List[object] = []
+        for item in value:
+            is_small, copied_item = cls._copy_safe_context_primitive(item)
+            if not is_small:
+                return cls.BLOCKED_VALUE
+            copied_items.append(copied_item)
+
+        if isinstance(value, tuple):
+            return tuple(copied_items)
+        return copied_items
+
+    @classmethod
+    def _copy_safe_context_mapping(cls, value: ContextMapping) -> object:
+        if len(value) > cls.CONTEXT_MAX_ITEMS:
+            return cls.BLOCKED_VALUE
+
+        copied_items: Dict[str, object] = {}
+        for key, item in value.items():
+            if not isinstance(key, str) or len(key) > cls.CONTEXT_MAX_VALUE_LENGTH:
+                continue
+            is_small, copied_item = cls._copy_safe_context_primitive(item)
+            if is_small:
+                copied_items[key] = copied_item
+            elif cls._is_plain_context_sequence(item):
+                copied_items[key] = cls._copy_safe_context_sequence(item)
+            else:
+                copied_items[key] = cls.BLOCKED_VALUE
+        return copied_items
+
+    @classmethod
+    def _copy_safe_context(cls, value: object) -> object:
+        is_small, copied_value = cls._copy_safe_context_primitive(value)
+        if is_small:
+            return copied_value
+
+        if cls._is_plain_context_sequence(value):
+            return cls._copy_safe_context_sequence(value)
+
+        if cls._is_plain_context_mapping(value):
+            return cls._copy_safe_context_mapping(value)
+
+        return cls.BLOCKED_VALUE
 
     @staticmethod
     def _normalize_mask_path(path: MaskPath) -> Tuple[str, ...]:
@@ -710,7 +660,7 @@ class ExceptionTracker():
         return causes
 
     # L1 Methods
-    def get_exception_location(self, error: Exception) -> Result:
+    def get_exception_location(self, error: Exception) -> Result[str]:
         """
         Return the source location for an exception.
 
@@ -750,7 +700,7 @@ class ExceptionTracker():
         mask_paths: MaskPathsInput=(),
         traceback_frame_limit: int=DEFAULT_TRACEBACK_LIMIT,
         cause_limit: int=DEFAULT_TRACEBACK_LIMIT
-    ) -> Result:
+    ) -> Result[object]:
         """
         Build detailed internal exception information.
 
@@ -758,8 +708,8 @@ class ExceptionTracker():
         | Tag | Name | Type | Description |
         |-----|------|------|-------------|
         | **(R)** | `error` | `Exception` | The exception object to describe. |
-        | **(O)** | `user_input` | `object` | User input context. Stored as a bounded snapshot. Default: `None`. |
-        | **(O)** | `params` | `ExceptionParams` | Additional call context `(args, kwargs)`. Stored as bounded snapshots. Default: `((), {})`. |
+        | **(O)** | `user_input` | `object` | User input context. Small safe values are copied; heavy values are blocked. Default: `None`. |
+        | **(O)** | `params` | `ExceptionParams` | Additional call context `(args, kwargs)`. Small safe values are copied; heavy values are blocked. Default: `((), {})`. |
         | **(O)** | `mask_presets` | `MaskPresetsInput` | Named mask presets. Default: `("default",)`. |
         | **(O)** | `mask_paths` | `MaskPathsInput` | Extra paths to mask, such as `"id"`, `"location.origin"`, or `("error", "message")`. |
         | **(O)** | `traceback_frame_limit` | `int` | Max traceback frame entries. Default: `5`, max: `10000`. |
@@ -781,14 +731,15 @@ class ExceptionTracker():
 
         ### Warning
         > **Security:**
-        > - `user_input`, `params`, and `local_variables` are stored as bounded snapshots rather than raw object references.
-        > - Snapshot metadata, `traceback`, and `system_info` may still contain sensitive data.
+        > - `user_input`, `params`, and `local_variables` never store raw object references.
+        > - Heavy or unsupported context values are replaced with `"<BLOCKED>"` rather than summarized with metadata.
+        > - Small copied context values, `traceback`, and `system_info` may still contain sensitive data.
         > - Use `mask_presets=("private", "traceback", "system_info")` or explicit `mask_paths` before exposing error information outside a trusted boundary.
 
         ### Note
         > - This is the debug-heavy path for internal diagnostics.
         > - For safe external payloads, use `get_public_exception_info()` instead.
-        > - Context snapshots preserve small primitives directly and summarize large or custom objects with type, length, preview, and truncation metadata.
+        > - Context capture preserves small primitives and primitive-only `list`/`tuple` values; `dict` values are copied only at the top level.
         > - `mask_paths` accepts a single dot path such as `"location.origin"`.
         > - `mask_paths` accepts a single tuple path such as `("location", "origin")`.
         > - Use a list for multiple paths, such as `["id", "quick_info", ("error", "message")]`.
@@ -833,10 +784,10 @@ class ExceptionTracker():
             error_info["error"]["message"] = str(error)
             error_info["location"]["entry"] = self._frame_to_location(entry_frame)
             error_info["location"]["origin"] = origin_location
-            error_info["input_context"]["user_input"] = self._snapshot_context(user_input)
-            error_info["input_context"]["params"]["args"] = self._snapshot_context(args)
-            error_info["input_context"]["params"]["kwargs"] = self._snapshot_context(kwargs)
-            error_info["input_context"]["local_variables"] = self._snapshot_context(self._get_local_variables(error))
+            error_info["input_context"]["user_input"] = self._copy_safe_context(user_input)
+            error_info["input_context"]["params"]["args"] = self._copy_safe_context(args)
+            error_info["input_context"]["params"]["kwargs"] = self._copy_safe_context(kwargs)
+            error_info["input_context"]["local_variables"] = self._copy_safe_context(self._get_local_variables(error))
             error_info["causes"] = self._get_exception_causes(error, cause_limit)
             error_info["traceback"] = ''.join(traceback.format_exception(type(error), error, error.__traceback__))
             error_info["traceback_frames"] = [
@@ -863,7 +814,7 @@ class ExceptionTracker():
         public_context: Optional[str]=None,
         tags: Optional[PublicTags]=None,
         retryable: Optional[bool]=None
-    ) -> Result:
+    ) -> Result[Dict[str, object]]:
         """
         Build lightweight public exception information safe to expose externally.
 
@@ -923,7 +874,7 @@ class ExceptionTracker():
         params: ExceptionParams=((), {}),
         mask_presets: MaskPresetsInput=DEFAULT_MASK_PRESETS,
         mask_paths: MaskPathsInput=()
-    ) -> Result:
+    ) -> Result[object]:
         """
         Build a standardized debug-heavy failure `Result` from an exception.
 
@@ -931,8 +882,8 @@ class ExceptionTracker():
         | Tag | Name | Type | Description |
         |-----|------|------|-------------|
         | **(R)** | `error` | `Exception` | The exception object to track. |
-        | **(O)** | `user_input` | `object` | User input context. Stored as a bounded snapshot. Default: `None`. |
-        | **(O)** | `params` | `ExceptionParams` | Additional call context `(args, kwargs)`. Stored as bounded snapshots. Default: `((), {})`. |
+        | **(O)** | `user_input` | `object` | User input context. Small safe values are copied; heavy values are blocked. Default: `None`. |
+        | **(O)** | `params` | `ExceptionParams` | Additional call context `(args, kwargs)`. Small safe values are copied; heavy values are blocked. Default: `((), {})`. |
         | **(O)** | `mask_presets` | `MaskPresetsInput` | Named mask presets. Default: `("default",)`. |
         | **(O)** | `mask_paths` | `MaskPathsInput` | Extra paths to mask, such as `"id"`, `"location.origin"`, or `("error", "message")`. |
 
@@ -952,7 +903,7 @@ class ExceptionTracker():
 
         ### Warning
         > **Security:**
-        > - The returned error information uses bounded context snapshots but may still contain sensitive metadata unless suitable `mask_presets` or `mask_paths` are used.
+        > - The returned error information copies only small safe context values but may still contain sensitive data unless suitable `mask_presets` or `mask_paths` are used.
 
         ### Note
         > - This method keeps the existing debug-oriented payload behavior.
@@ -981,7 +932,7 @@ class ExceptionTracker():
         public_context: Optional[str]=None,
         tags: Optional[PublicTags]=None,
         retryable: Optional[bool]=None
-    ) -> Result:
+    ) -> Result[Dict[str, object]]:
         """
         Build a standardized public-safe failure `Result` from an exception.
 
@@ -1023,7 +974,7 @@ class ExceptionTracker():
             retryable=retryable,
         )
 
-    def get_error_code(self, error_id_map: Mapping[str, object], error: Exception) -> Result:
+    def get_error_code(self, error_id_map: Mapping[str, object], error: Exception) -> Result[object]:
         """
         Return a user-defined error code for a given exception type.
 
@@ -1086,7 +1037,7 @@ class ExceptionTrackerDecorator():
     > | `'system_info'` | Masks `system_info`. |
 
     ### Returns
-    `Callable[P, Union[R, Result]]` — Wrapped function returning the original result or a failure `Result` on error.
+    `Callable[P, Union[R, Result[object]]]` — Wrapped function returning the original result or a failure `Result` on error.
 
     ### Note
     > - Converts uncaught exceptions into standardized `Result` objects.
@@ -1114,9 +1065,9 @@ class ExceptionTrackerDecorator():
         self.mask_presets = ExceptionTracker._normalize_mask_presets(mask_presets)
         self.mask_paths = ExceptionTracker._normalize_mask_paths(mask_paths)
 
-    def __call__(self, func: Callable[P, R]) -> Callable[P, Union[R, Result]]:
+    def __call__(self, func: Callable[P, R]) -> Callable[P, Union[R, Result[object]]]:
         @wraps(func)
-        def wrapper(*args: P.args, **kwargs: P.kwargs) -> Union[R, Result]:
+        def wrapper(*args: P.args, **kwargs: P.kwargs) -> Union[R, Result[object]]:
             try:
                 return func(*args, **kwargs)
             except Exception as e:

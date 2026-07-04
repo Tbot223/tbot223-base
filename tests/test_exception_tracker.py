@@ -1,7 +1,5 @@
 import gc
 import weakref
-from collections.abc import Mapping
-import pytest
 
 from tbot223_base import tbot223_Exception
 from tbot223_base.tbot223_Exception import ExceptionTracker, ExceptionTrackerDecorator
@@ -14,64 +12,6 @@ class _LargeContext:
 
     def __repr__(self):
         raise AssertionError("custom repr should not be called")
-
-
-class _BadLen:
-    def __len__(self):
-        raise RuntimeError("len failed")
-
-
-class _BadShape:
-    @property
-    def shape(self):
-        raise RuntimeError("shape failed")
-
-
-class _TupleShape:
-    shape = (1, object())
-
-
-class _ListShape:
-    shape = [2, object()]
-
-
-class _ObjectShape:
-    shape = object()
-
-
-class _BadRepr:
-    def __repr__(self):
-        raise RuntimeError("repr failed")
-
-
-class _PretendBuiltinBadRepr:
-    __module__ = "builtins"
-
-    def __repr__(self):
-        raise RuntimeError("repr failed")
-
-
-class _StringShape:
-    shape = "rows"
-
-
-class _BadMapping(Mapping):
-    def __iter__(self):
-        return iter(["key"])
-
-    def __len__(self):
-        return 1
-
-    def __getitem__(self, key):
-        return "value"
-
-    def items(self):
-        raise RuntimeError("items failed")
-
-
-class _BadSequence(list):
-    def __iter__(self):
-        raise RuntimeError("iter failed")
 
 
 def _raise_zero_division_error():
@@ -192,14 +132,10 @@ def test_get_exception_info_does_not_retain_raw_context_objects():
 
     assert result.status is ResultStatus.FAILURE
     assert not _contains_identity(result.data, large_context)
-    assert (
-        result.data["input_context"]["params"]["args"]["items"][0]["type"]
-        == f"{_LargeContext.__module__}._LargeContext"
-    )
-    assert (
-        result.data["input_context"]["local_variables"]["items"]["local_payload"]["type"]
-        == f"{_LargeContext.__module__}._LargeContext"
-    )
+    assert result.data["input_context"]["params"]["args"] == (ExceptionTracker.BLOCKED_VALUE,)
+    assert result.data["input_context"]["params"]["kwargs"]["context"] == ExceptionTracker.BLOCKED_VALUE
+    assert result.data["input_context"]["local_variables"]["local_payload"] == ExceptionTracker.BLOCKED_VALUE
+    assert result.data["input_context"]["local_variables"]["local_list"] == [ExceptionTracker.BLOCKED_VALUE]
 
     del large_context
     gc.collect()
@@ -207,56 +143,52 @@ def test_get_exception_info_does_not_retain_raw_context_objects():
     assert context_ref() is None
 
 
-def test_get_exception_info_snapshots_large_values_and_collections():
+def test_get_exception_info_blocks_large_values_and_heavy_objects():
     tracker = ExceptionTracker()
-    long_text = "x" * (ExceptionTracker.CONTEXT_MAX_REPR_LENGTH + 1)
+    long_text = "x" * (ExceptionTracker.CONTEXT_MAX_VALUE_LENGTH + 1)
     large_list = list(range(ExceptionTracker.CONTEXT_MAX_ITEMS + 1))
     large_dict = {
         f"key_{index}": index
         for index in range(ExceptionTracker.CONTEXT_MAX_ITEMS + 1)
     }
     custom_context = _LargeContext()
+    small_tuple = ("ok", 1, True, None)
+    small_list = ["ok", 2.5, False, None]
 
     try:
-        raise RuntimeError("snapshot me")
+        raise RuntimeError("block me")
     except Exception as error:
         result = tracker.get_exception_info(
             error,
             user_input=long_text,
-            params=((large_list,), {"mapping": large_dict, "custom": custom_context, "nested": [[custom_context]]}),
+            params=(
+                (large_list, small_tuple),
+                {
+                    "mapping": large_dict,
+                    "custom": custom_context,
+                    "nested": [[custom_context]],
+                    "small_list": small_list,
+                },
+            ),
             mask_presets=(),
         )
 
     context = result.data["input_context"]
-    assert context["user_input"] == {
-        "type": "str",
-        "length": ExceptionTracker.CONTEXT_MAX_REPR_LENGTH + 1,
-        "preview": "x" * ExceptionTracker.CONTEXT_MAX_REPR_LENGTH,
-        "truncated": True,
-    }
+    assert context["user_input"] == ExceptionTracker.BLOCKED_VALUE
 
-    args_snapshot = context["params"]["args"]
-    list_snapshot = args_snapshot["items"][0]
-    assert args_snapshot["type"] == "tuple"
-    assert list_snapshot["type"] == "list"
-    assert list_snapshot["length"] == ExceptionTracker.CONTEXT_MAX_ITEMS + 1
-    assert len(list_snapshot["items"]) == ExceptionTracker.CONTEXT_MAX_ITEMS
-    assert list_snapshot["truncated"] is True
+    args_context = context["params"]["args"]
+    assert args_context == (ExceptionTracker.BLOCKED_VALUE, small_tuple)
+    assert args_context[1] is not small_tuple
 
-    kwargs_snapshot = context["params"]["kwargs"]
-    dict_snapshot = kwargs_snapshot["items"]["mapping"]
-    custom_snapshot = kwargs_snapshot["items"]["custom"]
-    nested_snapshot = kwargs_snapshot["items"]["nested"]
-    assert dict_snapshot["type"] == "dict"
-    assert dict_snapshot["length"] == ExceptionTracker.CONTEXT_MAX_ITEMS + 1
-    assert dict_snapshot["truncated"] is True
-    assert custom_snapshot["type"] == f"{_LargeContext.__module__}._LargeContext"
-    assert "repr" in custom_snapshot
-    assert nested_snapshot["items"][0]["type"] == "list"
-    assert nested_snapshot["items"][0]["truncated"] is True
+    kwargs_context = context["params"]["kwargs"]
+    assert kwargs_context["mapping"] == ExceptionTracker.BLOCKED_VALUE
+    assert kwargs_context["custom"] == ExceptionTracker.BLOCKED_VALUE
+    assert kwargs_context["nested"] == [ExceptionTracker.BLOCKED_VALUE]
+    assert kwargs_context["small_list"] == small_list
+    assert kwargs_context["small_list"] is not small_list
 
 
-def test_get_exception_info_masks_after_snapshotting():
+def test_get_exception_info_masks_after_context_capture():
     tracker = ExceptionTracker()
 
     try:
@@ -272,7 +204,7 @@ def test_get_exception_info_masks_after_snapshotting():
     assert result.data["input_context"]["local_variables"] == ExceptionTracker.MASKED_VALUE
 
 
-def test_get_exception_info_exposes_snapshots_when_unmasked():
+def test_get_exception_info_exposes_safe_context_when_unmasked():
     tracker = ExceptionTracker()
 
     try:
@@ -281,10 +213,9 @@ def test_get_exception_info_exposes_snapshots_when_unmasked():
         result = tracker.get_exception_info(error, mask_presets=())
 
     local_variables = result.data["input_context"]["local_variables"]
-    assert local_variables["type"] == "dict"
-    assert local_variables["items"]["value"]["type"] == f"{_LargeContext.__module__}._LargeContext"
-    assert local_variables["items"]["local_list"]["type"] == "list"
-    assert local_variables["items"]["local_list"]["items"][0]["type"] == f"{_LargeContext.__module__}._LargeContext"
+    assert local_variables["value"] == ExceptionTracker.BLOCKED_VALUE
+    assert local_variables["local_payload"] == ExceptionTracker.BLOCKED_VALUE
+    assert local_variables["local_list"] == [ExceptionTracker.BLOCKED_VALUE]
 
 
 def test_exception_tracker_helper_structures_are_independent():
@@ -316,6 +247,84 @@ def test_get_system_info_handles_unavailable_cwd(monkeypatch):
     error_info = tbot223_Exception.ExceptionTrackerHelper.get_system_info()
 
     assert error_info["Current_Working_Directory"] == "<Permission Denied or Unavailable>"
+
+
+def test_get_system_info_collects_only_bounded_environment_variables(monkeypatch):
+    helper = tbot223_Exception.ExceptionTrackerHelper
+    large_value = "x" * (helper.ENVIRONMENT_VARIABLE_MAX_VALUE_LENGTH + 1)
+    long_key = "K" * (helper.ENVIRONMENT_VARIABLE_MAX_VALUE_LENGTH + 1)
+    list_value = ["ok", 1, True, None]
+    tuple_value = ("ok", 1.5, False, None)
+    limited_environ = {
+        "SMALL_ENV": "ok",
+        "INT_ENV": 1,
+        "BOOL_ENV": True,
+        "NONE_ENV": None,
+        "LIST_ENV": list_value,
+        "TUPLE_ENV": tuple_value,
+        "VIRTUAL_ENV": tuple_value,
+        "LARGE_ENV": large_value,
+        "DICT_ENV": {"nested": "value"},
+        "SET_ENV": {"value"},
+        "BYTES_ENV": b"value",
+        "OBJECT_ENV": object(),
+        "NESTED_LIST_ENV": [["nested"]],
+        "LIST_WITH_LARGE_STRING_ENV": [large_value],
+        "LARGE_LIST_ENV": list(range(helper.ENVIRONMENT_VARIABLE_MAX_COUNT + 1)),
+        long_key: "ok",
+        object(): "bad-key",
+    }
+    limited_environ.update(
+        {
+            f"SMALL_{index}": "ok"
+            for index in range(helper.ENVIRONMENT_VARIABLE_MAX_COUNT + 1)
+        }
+    )
+    monkeypatch.setattr(tbot223_Exception.os, "environ", limited_environ)
+
+    info = helper.get_system_info()
+    environment_variables = info["Environment_Variables"]
+
+    assert environment_variables["SMALL_ENV"] == "ok"
+    assert environment_variables["INT_ENV"] == 1
+    assert environment_variables["BOOL_ENV"] is True
+    assert environment_variables["NONE_ENV"] is None
+    assert environment_variables["LIST_ENV"] == list_value
+    assert environment_variables["LIST_ENV"] is not list_value
+    assert environment_variables["TUPLE_ENV"] == tuple_value
+    assert environment_variables["TUPLE_ENV"] is not tuple_value
+    assert environment_variables["VIRTUAL_ENV"] == tuple_value
+    assert "LARGE_ENV" not in environment_variables
+    assert "DICT_ENV" not in environment_variables
+    assert "SET_ENV" not in environment_variables
+    assert "BYTES_ENV" not in environment_variables
+    assert "OBJECT_ENV" not in environment_variables
+    assert "NESTED_LIST_ENV" not in environment_variables
+    assert "LIST_WITH_LARGE_STRING_ENV" not in environment_variables
+    assert "LARGE_LIST_ENV" not in environment_variables
+    assert long_key not in environment_variables
+    assert all(isinstance(key, str) for key in environment_variables)
+    assert info["Virtual_Env"] == "None"
+    assert len(environment_variables) == helper.ENVIRONMENT_VARIABLE_MAX_COUNT
+
+    monkeypatch.setattr(tbot223_Exception.os, "environ", {"VIRTUAL_ENV": "venv"})
+    string_virtual_info = helper.get_system_info()
+
+    assert string_virtual_info["Virtual_Env"] == "venv"
+    assert string_virtual_info["Environment_Variables"]["VIRTUAL_ENV"] == "venv"
+
+    monkeypatch.setattr(tbot223_Exception.os, "environ", {"VIRTUAL_ENV": large_value})
+    large_virtual_info = helper.get_system_info()
+
+    assert large_virtual_info["Virtual_Env"] == "None"
+    assert "VIRTUAL_ENV" not in large_virtual_info["Environment_Variables"]
+
+    class _NonMappingEnvironment:
+        environ = []
+
+    monkeypatch.setattr(tbot223_Exception, "os", _NonMappingEnvironment)
+
+    assert helper._get_small_environment_variables() == {}
 
 
 def test_format_location_and_traceback_helpers_handle_missing_values():
@@ -380,13 +389,39 @@ def test_mask_paths_ignores_missing_and_masks_existing_values():
     assert payload["level"]["not_dict"] == "text"
 
 
-def test_mapping_snapshot_keeps_non_string_keys_in_entries():
+def test_copy_safe_context_keeps_small_values_and_blocks_heavy_values():
     key = object()
-    snapshot = ExceptionTracker._snapshot_context({key: "value"})
+    small_list = ["ok", 1, True, None]
+    small_tuple = ("ok", 2.5, False, None)
+    payload = {
+        "text": "ok",
+        "number": 1,
+        "list": small_list,
+        "tuple": small_tuple,
+        "nested": [["nested"]],
+        "nested_dict": {"small": "value"},
+        "bytes": b"value",
+        "object": object(),
+        key: "ignored",
+    }
 
-    assert snapshot["items"] == {}
-    assert snapshot["entries"][0]["key"]["type"] == "object"
-    assert snapshot["entries"][0]["value"] == "value"
+    copied = ExceptionTracker._copy_safe_context(payload)
+
+    assert copied["text"] == "ok"
+    assert copied["number"] == 1
+    assert copied["list"] == small_list
+    assert copied["list"] is not small_list
+    assert copied["tuple"] == small_tuple
+    assert copied["tuple"] is not small_tuple
+    assert copied["nested"] == [["nested"]]
+    assert copied["nested_dict"] == ExceptionTracker.BLOCKED_VALUE
+    assert copied["bytes"] == ExceptionTracker.BLOCKED_VALUE
+    assert copied["object"] == ExceptionTracker.BLOCKED_VALUE
+    assert all(isinstance(copied_key, str) for copied_key in copied)
+
+    assert ExceptionTracker._copy_safe_context("x" * (ExceptionTracker.CONTEXT_MAX_VALUE_LENGTH + 1)) == ExceptionTracker.BLOCKED_VALUE
+    assert ExceptionTracker._copy_safe_context(list(range(ExceptionTracker.CONTEXT_MAX_ITEMS + 1))) == ExceptionTracker.BLOCKED_VALUE
+    assert ExceptionTracker._copy_safe_context({f"key_{index}": index for index in range(ExceptionTracker.CONTEXT_MAX_ITEMS + 1)}) == ExceptionTracker.BLOCKED_VALUE
 
 
 def test_exception_causes_breaks_cycles():
@@ -402,62 +437,6 @@ def test_exception_causes_breaks_cycles():
     assert causes[0]["type"] == "ValueError"
 
 
-def test_snapshot_context_covers_bytes_cycles_shape_and_failure_paths():
-    tracker = ExceptionTracker()
-    recursive = []
-    recursive.append(recursive)
-
-    bytes_snapshot = tracker._snapshot_context(b"x" * (ExceptionTracker.CONTEXT_MAX_REPR_LENGTH + 1))
-    bytearray_snapshot = tracker._snapshot_context(bytearray(b"abc"))
-    memoryview_snapshot = tracker._snapshot_context(memoryview(b"abcdef"))
-    recursive_snapshot = tracker._snapshot_context(recursive)
-    bad_mapping_snapshot = tracker._snapshot_context(_BadMapping())
-    bad_sequence_snapshot = tracker._snapshot_context(_BadSequence([1]))
-
-    assert bytes_snapshot["type"] == "bytes"
-    assert bytes_snapshot["length"] == ExceptionTracker.CONTEXT_MAX_REPR_LENGTH + 1
-    assert bytes_snapshot["truncated"] is True
-    assert bytearray_snapshot["type"] == "bytearray"
-    assert memoryview_snapshot["type"] == "memoryview"
-    assert memoryview_snapshot["length"] == 6
-    assert recursive_snapshot["items"][0] == {"type": "list", "cycle": True}
-    assert bad_mapping_snapshot["type"] == f"{_BadMapping.__module__}._BadMapping"
-    assert bad_mapping_snapshot["truncated"] is True
-    assert bad_sequence_snapshot["type"] == f"{_BadSequence.__module__}._BadSequence"
-    assert bad_sequence_snapshot["truncated"] is True
-
-
-def test_metadata_snapshot_handles_len_repr_and_shape_edges():
-    tracker = ExceptionTracker()
-
-    assert tracker._safe_len(object()) is None
-    assert tracker._safe_len(_BadLen()) is None
-    assert tracker._safe_shape(_BadShape()) is None
-    assert tracker._safe_shape(_StringShape()) == "rows"
-    assert tracker._safe_shape(_TupleShape())[0] == 1
-    assert tracker._safe_shape(_ListShape())[0] == 2
-    assert tracker._safe_shape(_ObjectShape()) == "object"
-
-    bad_repr, truncated = tracker._safe_repr(_BadRepr())
-    assert bad_repr.startswith("<")
-    assert truncated is False
-
-    builtin_bad_repr, truncated = tracker._safe_repr(_PretendBuiltinBadRepr())
-    assert builtin_bad_repr.startswith("<")
-    assert truncated is False
-
-    long_repr, truncated = tracker._safe_repr("x" * (ExceptionTracker.CONTEXT_MAX_REPR_LENGTH + 10))
-    assert len(long_repr) == ExceptionTracker.CONTEXT_MAX_REPR_LENGTH
-    assert truncated is True
-
-    list_metadata = tracker._metadata_snapshot([1, 2], truncated=True)
-    object_metadata = tracker._metadata_snapshot(_TupleShape())
-
-    assert list_metadata["repr"] == "<list snapshot omitted>"
-    assert list_metadata["truncated"] is True
-    assert object_metadata["shape"][0] == 1
-
-
 def test_get_exception_info_handles_invalid_params_and_limits():
     tracker = ExceptionTracker()
 
@@ -470,11 +449,11 @@ def test_get_exception_info_handles_invalid_params_and_limits():
             mask_presets=("traceback", "system_info"),
             traceback_frame_limit=0,
             cause_limit=-1,
-        )
+    )
 
     info = result.data
-    assert info["input_context"]["params"]["args"]["type"] == "tuple"
-    assert info["input_context"]["params"]["kwargs"]["type"] == "dict"
+    assert info["input_context"]["params"]["args"] == ()
+    assert info["input_context"]["params"]["kwargs"] == {}
     assert info["traceback_frames"] == ExceptionTracker.MASKED_VALUE
     assert info["traceback"] == ExceptionTracker.MASKED_VALUE
     assert info["system_info"] == ExceptionTracker.MASKED_VALUE

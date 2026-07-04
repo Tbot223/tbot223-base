@@ -13,7 +13,7 @@
 ## 레퍼런스
 
 - [Result 레퍼런스](reference/result.md): 상태 모델, legacy 호환성, unwrap 계열 helper.
-- [ExceptionTracker 레퍼런스](reference/exception-tracker.md): debug payload, public payload, masking, context snapshot 정책.
+- [ExceptionTracker 레퍼런스](reference/exception-tracker.md): debug payload, public payload, masking, safe context capture 정책.
 
 ## 릴리스 노트
 

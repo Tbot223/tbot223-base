@@ -47,17 +47,17 @@ One-line summary.
 The structural floor of a full docstring is the one-line summary, `Arguments`, and `Returns`. Add other sections only when there is supporting evidence.
 
 ```python
-def unwrap_or(self, default: Any) -> Any:
+def unwrap_or(self, default: _DefaultT) -> Union[_DataT, _DefaultT]:
     """
     Return the contained `data` if successful; otherwise return `default`.
 
     ### Arguments
     | Tag | Name | Type | Description |
     |-----|------|------|-------------|
-    | **(R)** | `default` | `Any` | Fallback value used when the result is not successful. |
+    | **(R)** | `default` | `_DefaultT` | Fallback value used when the result is not successful. |
 
     ### Returns
-    `Any` — The stored payload if successful, otherwise `default`.
+    `Union[_DataT, _DefaultT]` — The stored payload if successful, otherwise `default`.
     """
 ```
 
@@ -341,17 +341,17 @@ Write the Example in `>>>` REPL form.
 A basic form based on the real `Result.unwrap_or` in `tbot223_base`.
 
 ```python
-def unwrap_or(self, default: Any) -> Any:
+def unwrap_or(self, default: _DefaultT) -> Union[_DataT, _DefaultT]:
     """
     Return the contained `data` if successful; otherwise return `default`.
 
     ### Arguments
     | Tag | Name | Type | Description |
     |-----|------|------|-------------|
-    | **(R)** | `default` | `Any` | Fallback value used when the result is not successful. |
+    | **(R)** | `default` | `_DefaultT` | Fallback value used when the result is not successful. |
 
     ### Returns
-    `Any` — The stored payload if successful, otherwise `default`.
+    `Union[_DataT, _DefaultT]` — The stored payload if successful, otherwise `default`.
 
     ### Example
     >>> from tbot223_base.tbot223_Result import Result
@@ -380,8 +380,8 @@ def get_exception_info(
     | Tag | Name | Type | Description |
     |-----|------|------|-------------|
     | **(R)** | `error` | `Exception` | The exception object to describe. |
-    | **(O)** | `user_input` | `object` | User input context. Stored as a bounded snapshot. Default: `None`. |
-    | **(O)** | `params` | `ExceptionParams` | Additional call context `(args, kwargs)`. Stored as bounded snapshots. Default: `((), {})`. |
+    | **(O)** | `user_input` | `object` | User input context. Small safe values are copied; heavy values are blocked. Default: `None`. |
+    | **(O)** | `params` | `ExceptionParams` | Additional call context `(args, kwargs)`. Small safe values are copied; heavy values are blocked. Default: `((), {})`. |
     | **(O)** | `mask_presets` | `MaskPresetsInput` | Named mask presets. Default: `("default",)`. |
     | **(O)** | `mask_paths` | `MaskPathsInput` | Extra paths to mask. Default: `()`. |
 
@@ -401,12 +401,14 @@ def get_exception_info(
 
     ### Warning
     > **Security:**
-    > - `user_input`, `params`, and `local_variables` are stored as bounded snapshots rather than raw object references.
-    > - Snapshot metadata, `traceback`, and `system_info` may still contain sensitive data.
+    > - `user_input`, `params`, and `local_variables` never store raw object references.
+    > - Heavy or unsupported context values are replaced with `"<BLOCKED>"` rather than summarized with metadata.
+    > - Small copied context values, `traceback`, and `system_info` may still contain sensitive data.
+    > - Environment variables inside `system_info` are copied only when they are small primitives or shallow tuple/list values with small primitive items.
     > - Apply `mask_presets=("private", "traceback", "system_info")` before exposing error information outside a trusted boundary.
 
     ### Note
-    > Context snapshots preserve small primitives directly and summarize large or custom objects with type, length, preview, and truncation metadata.
+    > Context capture preserves small primitives and primitive-only `list`/`tuple` values; `dict` values are copied only at the top level.
     > Unknown preset names and invalid mask paths are ignored rather than rejected.
 
     ### Example
@@ -425,7 +427,7 @@ def get_exception_info(
 An example based on the real `Result.unwrap` in `tbot223_base`. When `success` is not `True`, it actually raises `ResultUnwrapException`, so Constraint and Raises are written together.
 
 ```python
-def unwrap(self) -> Any:
+def unwrap(self) -> _DataT:
     """
     Return the contained `data` when the result represents success.
 
@@ -433,13 +435,13 @@ def unwrap(self) -> Any:
     None
 
     ### Constraint
-    > - `self.success` MUST be `True`.
+    > - `self.status` MUST be `ResultStatus.SUCCESS`.
 
     ### Returns
-    `Any` — The stored payload.
+    `_DataT` — The stored payload.
 
     ### Raises
-    > - `ResultUnwrapException` — Raised when `success` is not `True`.
+    > - `ResultUnwrapException` — Raised when `status` is not `ResultStatus.SUCCESS`.
 
     ### Example
     >>> from tbot223_base.tbot223_Result import Result
@@ -525,7 +527,7 @@ def thread_pool_executor(
 ## 10. Special Forms
 
 Most special forms reuse existing sections instead of adding new ones. The table below lists only the per-form delta.
-`Result` is an actual `NamedTuple`, so the dataclass / NamedTuple row is grounded in real code, while the async, generator, and context manager rows are for format illustration because the base package has no such code.
+`Result` is a generic tuple-like container, so the dataclass / NamedTuple row is grounded in real field documentation, while the async, generator, and context manager rows are for format illustration because the base package has no such code.
 
 | Form | Key rule |
 |------|----------|
@@ -555,14 +557,14 @@ Most special forms reuse existing sections instead of adding new ones. The table
 
 ### dataclass / NamedTuple Field Example
 
-A class-level field table based on the real `Result` (`NamedTuple`) field names and types in `tbot223_base`.
+A class-level field table based on the real generic `Result` tuple-like field names and types in `tbot223_base`.
 
 ```markdown
 ### Arguments
 | Tag | Name | Type | Description |
 |-----|------|------|-------------|
-| **(R)** | `success` | `bool` | Whether the operation succeeded. |
+| **(R)** | `status` | `ResultStatus` | Overall operation state. |
 | **(R)** | `error` | `Optional[str]` | Error label when not successful. |
-| **(R)** | `context` | `str` | Call-site context label. |
-| **(R)** | `data` | `Any` | Payload carried on the result. |
+| **(R)** | `context` | `Optional[str]` | Call-site context label. |
+| **(R)** | `data` | `_DataT` | Payload carried on the result. |
 ```
