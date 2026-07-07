@@ -1,0 +1,117 @@
+name: Publish Package
+
+on:
+  release:
+    types: [published]
+
+permissions:
+  contents: read
+
+jobs:
+  release-gate:
+    name: Validate release gate
+    runs-on: ubuntu-latest
+
+    steps:
+      - name: Check out repository
+        uses: actions/checkout@v6
+        with:
+          fetch-depth: 0
+
+      - name: Validate tag, branch, and package version
+        run: |
+          set -euo pipefail
+
+          TAG_NAME="${{ github.event.release.tag_name }}"
+
+          if [[ -z "${TAG_NAME}" ]]; then
+            echo "GitHub Release must have a tag."
+            exit 1
+          fi
+
+          if [[ ! "${TAG_NAME}" =~ ^v[0-9]+\.[0-9]+\.[0-9]+$ ]]; then
+            echo "Release tag must use vMAJOR.MINOR.PATCH format, for example v0.1.0."
+            exit 1
+          fi
+
+          git fetch --force origin main:refs/remotes/origin/main --tags
+
+          TAG_COMMIT="$(git rev-list -n 1 "${TAG_NAME}")"
+
+          if ! git merge-base --is-ancestor "${TAG_COMMIT}" origin/main; then
+            echo "Release tag ${TAG_NAME} must point to a commit contained in origin/main."
+            exit 1
+          fi
+
+          PACKAGE_VERSION="$(python - <<'PY'
+          from tbot223_base import __version__
+
+          print(__version__)
+          PY
+          )"
+          TAG_VERSION="${TAG_NAME#v}"
+
+          if [[ "${PACKAGE_VERSION}" != "${TAG_VERSION}" ]]; then
+            echo "Package version ${PACKAGE_VERSION} does not match release tag ${TAG_NAME}."
+            exit 1
+          fi
+
+  compatibility:
+    name: Compatibility tests
+    needs: release-gate
+    uses: ./.github/workflows/python-compatibility.yml
+
+  build:
+    name: Build distributions
+    needs:
+      - release-gate
+      - compatibility
+    runs-on: ubuntu-latest
+
+    steps:
+      - name: Check out repository
+        uses: actions/checkout@v6
+
+      - name: Set up Python
+        uses: actions/setup-python@v6
+        with:
+          python-version: "3.12"
+          cache: pip
+
+      - name: Install build tools
+        run: |
+          python -m pip install --upgrade pip
+          python -m pip install build twine
+
+      - name: Build package
+        run: python -m build --sdist --wheel
+
+      - name: Check package metadata
+        run: python -m twine check dist/*
+
+      - name: Store package distributions
+        uses: actions/upload-artifact@v4
+        with:
+          name: python-package-distributions
+          path: dist/
+
+  publish:
+    name: Publish to PyPI
+    needs: build
+    runs-on: ubuntu-latest
+    environment:
+      name: pypi
+      url: https://pypi.org/p/tbot223-base
+    permissions:
+      contents: read
+      id-token: write
+
+    steps:
+      - name: Download package distributions
+        uses: actions/download-artifact@v4
+        with:
+          name: python-package-distributions
+          path: dist/
+
+      - name: Publish package distributions to PyPI
+        uses: pypa/gh-action-pypi-publish@release/v1

@@ -1,0 +1,19 @@
+services:
+  test:
+    build:
+      context: .
+    image: tbot223-base-check:local
+    working_dir: /workspace
+    volumes:
+      - .:/workspace
+    entrypoint: ["pytest"]
+    command: ["-q"]
+
+  check:
+    build:
+      context: .
+    image: tbot223-base-check:local
+    working_dir: /workspace
+    volumes:
+      - .:/workspace
+    command: ["v0.1.0"]
