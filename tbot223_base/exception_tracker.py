@@ -6,14 +6,9 @@ import time
 import traceback
 import uuid
 from collections.abc import Iterable, Mapping
-from typing import Callable, Dict, List, Literal, Optional, Tuple, TypeVar, Union, cast
+from typing import Callable, Dict, List, Literal, Optional, ParamSpec, Tuple, TypeAlias, TypeGuard, TypeVar, Union, cast
 from functools import wraps
 import threading
-
-try:
-    from typing import ParamSpec, TypeAlias, TypeGuard
-except ImportError:  # pragma: no cover - exercised on Python 3.9 in CI.
-    from typing_extensions import ParamSpec, TypeAlias, TypeGuard
 
 # internal modules
 from tbot223_base.result import Result, ResultStatus

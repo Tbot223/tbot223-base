@@ -1,21 +1,64 @@
 [build-system]
-requires = ["setuptools>=69"]
+requires = ["setuptools>=77"]
 build-backend = "setuptools.build_meta"
 
 [project]
 name = "tbot223-base"
-version = "0.0.1"
+dynamic = ["version"]
 description = "Base result and exception tracking utilities for Python."
 readme = "README.md"
-requires-python = ">=3.9"
-license = { file = "LICENSE" }
-dependencies = [
-    "typing-extensions>=4.9; python_version < '3.10'",
+requires-python = ">=3.10"
+license = "Apache-2.0"
+license-files = ["LICENSE"]
+authors = [
+    { name = "tbot223", email = "tbotxyz@gmail.com" },
 ]
+maintainers = [
+    { name = "tbot223", email = "tbotxyz@gmail.com" },
+]
+keywords = [
+    "result",
+    "exception",
+    "error-handling",
+    "python",
+    "typing",
+]
+classifiers = [
+    "Development Status :: 3 - Alpha",
+    "Intended Audience :: Developers",
+    "Programming Language :: Python :: 3",
+    "Programming Language :: Python :: 3 :: Only",
+    "Programming Language :: Python :: 3.10",
+    "Programming Language :: Python :: 3.11",
+    "Programming Language :: Python :: 3.12",
+    "Programming Language :: Python :: 3.13",
+    "Programming Language :: Python :: 3.14",
+    "Topic :: Software Development :: Libraries :: Python Modules",
+    "Typing :: Typed",
+]
+dependencies = []
+
+[project.urls]
+Homepage = "https://github.com/Tbot223/tbot223-base"
+Source = "https://github.com/Tbot223/tbot223-base"
+Issues = "https://github.com/Tbot223/tbot223-base/issues"
 
 [project.optional-dependencies]
 test = [
     "pytest>=8",
+]
+release = [
+    "build>=1",
+    "setuptools>=77",
+    "twine>=5",
+    "wheel>=0.43",
+]
+dev = [
+    "build>=1",
+    "pytest>=8",
+    "setuptools>=77",
+    "twine>=5",
+    "wheel>=0.43",
 ]
 
 [tool.setuptools.packages.find]
@@ -23,6 +66,9 @@ include = ["tbot223_base*"]
 
 [tool.setuptools.package-data]
 tbot223_base = ["py.typed"]
+
+[tool.setuptools.dynamic]
+version = { attr = "tbot223_base.__version__" }
 
 [tool.pytest.ini_options]
 testpaths = ["tests"]

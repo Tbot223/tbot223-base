@@ -1,6 +1,6 @@
 [한국어 (Korean)](../ko/README.md)
 
-> Runtime baseline: current `dev` branch checkout with `tbot223_base.__version__ == "0.0.1"`.
+> Runtime baseline: current `dev` branch checkout with `tbot223_base.__version__ == "0.1.0"`.
 
 # tbot223-base Docs
 
@@ -8,8 +8,9 @@ English documentation for using `Result`, `ResultStatus`, and `ExceptionTracker`
 
 ## Start Here
 
+- [Root README](../../README.md): project orientation, design intent, audience fit, trade-offs, and quickstart.
 - [Getting Started](guides/getting-started.md): import the package from a checkout or editable install and use the core APIs.
-- [Package and CI Guide](guides/package-and-ci.md): use `pyproject.toml`, editable installs, and optional compatibility CI.
+- [Package and CI Guide](guides/package-and-ci.md): use `pyproject.toml`, editable installs, compatibility CI, and release publishing.
 
 ## Reference
 

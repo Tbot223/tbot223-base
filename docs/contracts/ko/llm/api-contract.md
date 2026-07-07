@@ -18,11 +18,12 @@
 1. 변경이 public API, payload shape, import path, package-level export, validation tooling에 닿는지 확인한다.
 2. 사용자가 breaking migration을 명시적으로 요청하지 않았다면 canonical import path를 유지한다.
 3. Package-level public export를 canonical module object와 맞춘다.
-4. public/debug payload shape가 바뀌면 완료로 보기 전에 테스트를 갱신한다.
-5. public payload에는 debug-only field가 들어가지 않게 한다.
-6. debug payload safety behavior를 명시적으로 유지한다: safe copy, `"<BLOCKED>"`, capture 이후 masking.
-7. 지원 Python version range가 바뀌면 `pyproject.toml`, CI workflow, 사용자 문서를 함께 갱신한다.
-8. 현재 checkout에서 가능한 local verification command를 실행한다.
+4. `Result`는 Rust compatibility target이 아니라 독립적으로 형성된 Python 경계 교환 프로토콜로 설명한다.
+5. public/debug payload shape가 바뀌면 완료로 보기 전에 테스트를 갱신한다.
+6. public payload에는 debug-only field가 들어가지 않게 한다.
+7. debug payload safety behavior를 명시적으로 유지한다: safe copy, `"<BLOCKED>"`, capture 이후 masking.
+8. 지원 Python version range가 바뀌면 `pyproject.toml`, CI workflow, 사용자 문서를 함께 갱신한다.
+9. 현재 checkout에서 가능한 local verification command를 실행한다.
 
 ## 테스트 기대값
 

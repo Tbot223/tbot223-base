@@ -1,6 +1,6 @@
 [한국어 (Korean)](../../ko/reference/exception-tracker.md)
 
-> Runtime baseline: current `dev` branch checkout with `tbot223_base.__version__ == "0.0.1"`.
+> Runtime baseline: current `dev` branch checkout with `tbot223_base.__version__ == "0.1.0"`.
 
 # ExceptionTracker Reference
 

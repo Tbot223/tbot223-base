@@ -18,11 +18,12 @@ Read [../human/api-contract.md](../human/api-contract.md) first.
 1. Identify whether the change touches public API, payload shape, import paths, package-level exports, or validation tooling.
 2. Preserve canonical import paths unless the user explicitly requests a breaking migration.
 3. Keep package-level public exports aligned with canonical module objects.
-4. When public/debug payload shape changes, update tests before treating the change as complete.
-5. Keep public payloads free of debug-only fields.
-6. Keep debug payload safety behavior explicit: safe copies, `"<BLOCKED>"`, and masking after capture.
-7. If the supported Python version range changes, update `pyproject.toml`, CI workflow, and user docs together.
-8. Run the local verification commands that are available in the current checkout.
+4. Describe `Result` as an independently shaped Python boundary exchange protocol, not as a Rust compatibility target.
+5. When public/debug payload shape changes, update tests before treating the change as complete.
+6. Keep public payloads free of debug-only fields.
+7. Keep debug payload safety behavior explicit: safe copies, `"<BLOCKED>"`, and masking after capture.
+8. If the supported Python version range changes, update `pyproject.toml`, CI workflow, and user docs together.
+9. Run the local verification commands that are available in the current checkout.
 
 ## Test Expectations
 

@@ -9,6 +9,7 @@
 ## 1. Goal
 
 - Define the pre-release public API around Python-conventional canonical module paths.
+- Define `Result` as an independently shaped Python boundary exchange protocol, not as a Rust compatibility target.
 - Treat debug and public exception payloads as explicit contracts, not incidental dictionaries.
 - Preserve the safety boundary between internal diagnostics and public-facing error payloads.
 - Keep executable tests aligned with the contract whenever API or payload behavior changes.
@@ -49,6 +50,8 @@ Package-level exports in `tbot223_base.__init__` SHOULD expose the primary publi
 | `data` | Operation payload. |
 
 `ResultStatus` MUST keep the string values `success`, `failure`, and `cancelled`.
+
+`Result` MUST be documented as a boundary exchange shape for Python code. If Rust's `Result` is mentioned, it MUST be treated only as a comparison point, not as the source model or compatibility target.
 
 The `success=` input and `result.success` property SHOULD remain available as supported tri-state shorthand APIs until a documented breaking change removes them.
 
@@ -104,7 +107,7 @@ Tests SHOULD cover:
 - Public payload minimal fields and absence of debug-only fields.
 - Decorator conversion of uncaught exceptions into failure `Result` objects.
 
-The optional Python compatibility CI SHOULD run the test suite across the declared Python version matrix before release-like checkpoints.
+The Python compatibility CI SHOULD run the test suite across the declared Python version matrix on push, pull request, manual dispatch, and before release-like checkpoints.
 
 ## 9. Final Checklist
 

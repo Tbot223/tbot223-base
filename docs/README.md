@@ -1,7 +1,7 @@
 [English](en/README.md)
 [한국어 (Korean)](ko/README.md)
 
-> Runtime baseline: current `dev` branch checkout with `tbot223_base.__version__ == "0.0.1"`.
+> Runtime baseline: current `dev` branch checkout with `tbot223_base.__version__ == "0.1.0"`.
 
 # Documentation
 
@@ -9,6 +9,7 @@ This directory contains user-facing documentation and repository writing contrac
 
 ## User Docs
 
+- Root README: [English](../README.md), [Korean](../README.ko.md)
 - English: [en/README.md](en/README.md)
 - Korean: [ko/README.md](ko/README.md)
 - Package and CI guide: [en](en/guides/package-and-ci.md), [ko](ko/guides/package-and-ci.md)

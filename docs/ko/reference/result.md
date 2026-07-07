@@ -1,6 +1,6 @@
 [English](../../en/reference/result.md)
 
-> Runtime baseline: current `dev` branch checkout with `tbot223_base.__version__ == "0.0.1"`.
+> Runtime baseline: current `dev` branch checkout with `tbot223_base.__version__ == "0.1.0"`.
 
 # Result 레퍼런스
 
