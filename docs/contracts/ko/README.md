@@ -18,15 +18,22 @@
 - [human/docstring-contract.md](human/docstring-contract.md): Python docstring용 정본 계약이다.
 - [llm/docstring-contract.md](llm/docstring-contract.md): AI가 docstring을 작성하거나 수정할 때 따르는 실행 지시서다.
 
+### API 계약
+
+- [human/api-contract.md](human/api-contract.md): public import path, `Result`, `ExceptionTracker` payload shape용 정본 계약이다.
+- [llm/api-contract.md](llm/api-contract.md): API, payload, compatibility, validation 변경용 실행 지시서다.
+
 ## 권장 사용 방식
 
 - README, 가이드, 레퍼런스, 릴리스 노트, 계약 문서를 다룰 때는 일반 문서 계약부터 본다.
 - Python docstring을 다룰 때는 독스트링 계약부터 본다.
+- import path, `Result`, exception payload, API compatibility를 다룰 때는 API 계약부터 본다.
 - AI 작업에서는 해당 종류의 사람용 계약을 먼저 읽고 LLM 실행 지시서를 나중에 작업 지시서로 준다.
 
 ## 저장소 결정 사항
 
 - 적용 범위는 README 계열, 가이드/레퍼런스/릴리스 문서, 계약 문서다.
+- API 계약 범위는 canonical import path, payload shape, validation expectation이다.
 - TODO.md, 코드 주석, 비-Markdown 소스 파일은 범위에서 제외한다.
 - en/ko 문서가 모두 있을 때는 경로를 맞춘다.
 - 이 저장소의 일반 문서 계약은 중간 강도다. 프레임은 맞추되 문장 자체는 유연하게 둔다.

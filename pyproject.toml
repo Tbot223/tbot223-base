@@ -1,0 +1,28 @@
+[build-system]
+requires = ["setuptools>=69"]
+build-backend = "setuptools.build_meta"
+
+[project]
+name = "tbot223-base"
+version = "0.0.1"
+description = "Base result and exception tracking utilities for Python."
+readme = "README.md"
+requires-python = ">=3.9"
+license = { file = "LICENSE" }
+dependencies = [
+    "typing-extensions>=4.9; python_version < '3.10'",
+]
+
+[project.optional-dependencies]
+test = [
+    "pytest>=8",
+]
+
+[tool.setuptools.packages.find]
+include = ["tbot223_base*"]
+
+[tool.setuptools.package-data]
+tbot223_base = ["py.typed"]
+
+[tool.pytest.ini_options]
+testpaths = ["tests"]

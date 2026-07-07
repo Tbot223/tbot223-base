@@ -16,7 +16,7 @@ This reference covers `ResultStatus`, `Result`, and `ResultUnwrapException`.
 | `ResultStatus.FAILURE` | The operation failed. |
 | `ResultStatus.CANCELLED` | The operation was cancelled or not executed. |
 
-`ResultStatus.normalize()` accepts a `ResultStatus`, legacy `bool`, `None`, or a valid status string.
+`ResultStatus.normalize()` accepts a `ResultStatus`, tri-state shorthand values (`bool` or `None`), or a valid status string.
 
 ## Result
 
@@ -29,13 +29,17 @@ This reference covers `ResultStatus`, `Result`, and `ResultUnwrapException`.
 | `context` | `Optional[str]` | Operation context. |
 | `data` | `T` | Payload returned by the operation. |
 
-The legacy `success=` constructor argument is still supported. New code should prefer `status=ResultStatus...`.
+The `success=` constructor argument is supported as tri-state shorthand. New code should prefer `status=ResultStatus...` when it needs the explicit enum form.
 
 Use `Result[T]` when the payload type is known. `unwrap()` and `expect()` return `T`, and `unwrap_or(default)` returns either `T` or the default value type.
 
+## Import Path
+
+Import `Result`, `ResultStatus`, and `ResultUnwrapException` from `tbot223_base.result`.
+
 ## Predicates
 
-- `result.success`: legacy tri-state compatibility property returning `True`, `False`, or `None`.
+- `result.success`: tri-state shorthand property returning `True`, `False`, or `None`.
 - `result.is_success`: `True` only for `ResultStatus.SUCCESS`.
 - `result.is_failure`: `True` only for `ResultStatus.FAILURE`.
 - `result.is_cancelled`: `True` only for `ResultStatus.CANCELLED`.
@@ -49,7 +53,7 @@ Use `Result[T]` when the payload type is known. `unwrap()` and `expect()` return
 ## Example
 
 ```python
-from tbot223_base.tbot223_Result import Result, ResultStatus
+from tbot223_base.result import Result, ResultStatus
 
 result: Result[dict[str, str]] = Result(ResultStatus.FAILURE, "not found", "LoadProfile", None)
 

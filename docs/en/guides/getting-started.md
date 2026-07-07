@@ -4,18 +4,25 @@
 
 # Getting Started
 
-This guide shows the smallest useful path for importing `tbot223-base` from a repository checkout.
+This guide shows the smallest useful path for importing `tbot223-base` from a repository checkout or editable install.
 
 ## Prerequisites
 
 - Python is available in the environment.
-- The repository checkout is on `PYTHONPATH` or the current working directory is the repository root.
-- The current repository does not define packaging metadata, so this guide does not assume `pip install`.
+- The repository checkout is on `PYTHONPATH`, the current working directory is the repository root, or the checkout is installed in editable mode.
+- The repository defines minimal `pyproject.toml` packaging metadata for local package tooling.
+
+## Import Paths
+
+Use the canonical module paths for new code:
+
+- `tbot223_base.result`
+- `tbot223_base.exception_tracker`
 
 ## Result Basics
 
 ```python
-from tbot223_base.tbot223_Result import Result, ResultStatus
+from tbot223_base.result import Result, ResultStatus
 
 result: Result[dict[str, str]] = Result(
     status=ResultStatus.SUCCESS,
@@ -28,12 +35,12 @@ if result.is_success:
     print(result.unwrap())
 ```
 
-Use `ResultStatus.SUCCESS`, `ResultStatus.FAILURE`, and `ResultStatus.CANCELLED` for new code. The legacy `success=` constructor argument is still supported for compatibility.
+Use `ResultStatus.SUCCESS`, `ResultStatus.FAILURE`, and `ResultStatus.CANCELLED` for explicit status handling. The `success=` constructor argument is also supported as tri-state shorthand.
 
 ## Public Exception Payload
 
 ```python
-from tbot223_base.tbot223_Exception import ExceptionTracker
+from tbot223_base.exception_tracker import ExceptionTracker
 
 tracker = ExceptionTracker()
 
@@ -56,7 +63,7 @@ Use the public path for API responses, UI surfaces, or any boundary where raw ex
 ## Debug Exception Payload
 
 ```python
-from tbot223_base.tbot223_Exception import ExceptionTracker
+from tbot223_base.exception_tracker import ExceptionTracker
 
 tracker = ExceptionTracker()
 

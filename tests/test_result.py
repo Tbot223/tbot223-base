@@ -1,6 +1,7 @@
 import pytest
 
-from tbot223_base.tbot223_Result import Result, ResultStatus, ResultUnwrapException
+import tbot223_base
+from tbot223_base.result import Result, ResultStatus, ResultUnwrapException
 
 
 def test_result_status_normalize_accepts_enum_bool_none_and_string():
@@ -12,19 +13,25 @@ def test_result_status_normalize_accepts_enum_bool_none_and_string():
     assert ResultStatus.normalize(" FAILURE ") is ResultStatus.FAILURE
 
 
+def test_result_package_exports_share_api_objects():
+    assert tbot223_base.Result is Result
+    assert tbot223_base.ResultStatus is ResultStatus
+    assert tbot223_base.ResultUnwrapException is ResultUnwrapException
+
+
 def test_result_status_normalize_rejects_invalid_value():
     with pytest.raises(ValueError):
         ResultStatus.normalize("unknown")
 
 
-def test_result_accepts_status_and_legacy_success_inputs():
+def test_result_accepts_status_and_success_shorthand_inputs():
     modern = Result(ResultStatus.SUCCESS, None, "Modern", 123)
-    legacy = Result(success=False, error="boom", context="Legacy", data=None)
+    shorthand = Result(success=False, error="boom", context="Shorthand", data=None)
 
     assert modern.status is ResultStatus.SUCCESS
     assert modern.success is True
-    assert legacy.status is ResultStatus.FAILURE
-    assert legacy.success is False
+    assert shorthand.status is ResultStatus.FAILURE
+    assert shorthand.success is False
 
 
 def test_result_supports_generic_runtime_subscription():

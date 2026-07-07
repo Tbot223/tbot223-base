@@ -4,18 +4,25 @@
 
 # Getting Started
 
-이 가이드는 repository checkout 상태에서 `tbot223-base`를 바로 import해 쓰는 가장 작은 흐름을 보여준다.
+이 가이드는 repository checkout 또는 editable install 상태에서 `tbot223-base`를 import해 쓰는 가장 작은 흐름을 보여준다.
 
 ## 전제 조건
 
 - Python을 사용할 수 있어야 한다.
-- repository checkout이 `PYTHONPATH`에 있거나 현재 작업 디렉터리가 repository root여야 한다.
-- 현재 repository에는 packaging metadata가 없으므로 `pip install` 기반 설치를 단정하지 않는다.
+- repository checkout이 `PYTHONPATH`에 있거나, 현재 작업 디렉터리가 repository root이거나, checkout이 editable mode로 설치되어 있어야 한다.
+- 현재 repository는 local package tooling용 최소 `pyproject.toml` packaging metadata를 정의한다.
+
+## Import 경로
+
+새 코드는 canonical module path를 사용한다.
+
+- `tbot223_base.result`
+- `tbot223_base.exception_tracker`
 
 ## Result 기본 사용
 
 ```python
-from tbot223_base.tbot223_Result import Result, ResultStatus
+from tbot223_base.result import Result, ResultStatus
 
 result: Result[dict[str, str]] = Result(
     status=ResultStatus.SUCCESS,
@@ -28,12 +35,12 @@ if result.is_success:
     print(result.unwrap())
 ```
 
-새 코드는 `ResultStatus.SUCCESS`, `ResultStatus.FAILURE`, `ResultStatus.CANCELLED`를 우선 사용한다. Legacy `success=` 생성자 인자는 호환성을 위해 유지된다.
+명시적인 status 처리가 필요하면 `ResultStatus.SUCCESS`, `ResultStatus.FAILURE`, `ResultStatus.CANCELLED`를 사용한다. `success=` 생성자 인자는 tri-state shorthand로도 지원된다.
 
 ## Public 예외 payload
 
 ```python
-from tbot223_base.tbot223_Exception import ExceptionTracker
+from tbot223_base.exception_tracker import ExceptionTracker
 
 tracker = ExceptionTracker()
 
@@ -56,7 +63,7 @@ API 응답, UI, 외부 경계처럼 raw exception detail을 노출하면 안 되
 ## Debug 예외 payload
 
 ```python
-from tbot223_base.tbot223_Exception import ExceptionTracker
+from tbot223_base.exception_tracker import ExceptionTracker
 
 tracker = ExceptionTracker()
 

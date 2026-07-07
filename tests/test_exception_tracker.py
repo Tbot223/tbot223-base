@@ -1,9 +1,10 @@
 import gc
 import weakref
 
-from tbot223_base import tbot223_Exception
-from tbot223_base.tbot223_Exception import ExceptionTracker, ExceptionTrackerDecorator
-from tbot223_base.tbot223_Result import Result, ResultStatus
+import tbot223_base
+from tbot223_base import exception_tracker
+from tbot223_base.exception_tracker import ExceptionTracker, ExceptionTrackerDecorator
+from tbot223_base.result import Result, ResultStatus
 
 
 class _LargeContext:
@@ -71,6 +72,13 @@ def test_get_exception_location_points_to_origin_frame():
 
     assert result.status is ResultStatus.SUCCESS
     assert "inner" in result.data
+
+
+def test_exception_tracker_package_exports_share_api_objects():
+    assert tbot223_base.ExceptionTracker is ExceptionTracker
+    assert tbot223_base.ExceptionTrackerDecorator is ExceptionTrackerDecorator
+    assert exception_tracker.ExceptionTracker is ExceptionTracker
+    assert exception_tracker.ExceptionTrackerDecorator is ExceptionTrackerDecorator
 
 
 def test_get_exception_info_returns_debug_payload_with_masking():
@@ -219,38 +227,38 @@ def test_get_exception_info_exposes_safe_context_when_unmasked():
 
 
 def test_exception_tracker_helper_structures_are_independent():
-    info = tbot223_Exception.ExceptionTrackerHelper.get_error_info_structure()
-    public_info = tbot223_Exception.ExceptionTrackerHelper.get_public_error_info_structure()
+    info = exception_tracker.ExceptionTrackerHelper.get_error_info_structure()
+    public_info = exception_tracker.ExceptionTrackerHelper.get_public_error_info_structure()
 
     info["input_context"]["params"]["args"] = ("changed",)
     public_info["tags"]["changed"] = True
 
-    fresh_info = tbot223_Exception.ExceptionTrackerHelper.get_error_info_structure()
-    fresh_public_info = tbot223_Exception.ExceptionTrackerHelper.get_public_error_info_structure()
+    fresh_info = exception_tracker.ExceptionTrackerHelper.get_error_info_structure()
+    fresh_public_info = exception_tracker.ExceptionTrackerHelper.get_public_error_info_structure()
 
     assert fresh_info["input_context"]["params"]["args"] is None
     assert fresh_public_info["tags"] == {}
 
 
 def test_get_system_info_handles_unavailable_cwd(monkeypatch):
-    monkeypatch.setattr(tbot223_Exception.os, "access", lambda path, mode: False)
+    monkeypatch.setattr(exception_tracker.os, "access", lambda path, mode: False)
 
-    denied_info = tbot223_Exception.ExceptionTrackerHelper.get_system_info()
+    denied_info = exception_tracker.ExceptionTrackerHelper.get_system_info()
 
     assert denied_info["Current_Working_Directory"] == "<Permission Denied or Unavailable>"
 
     def broken_getcwd():
         raise RuntimeError("cwd failed")
 
-    monkeypatch.setattr(tbot223_Exception.os, "getcwd", broken_getcwd)
+    monkeypatch.setattr(exception_tracker.os, "getcwd", broken_getcwd)
 
-    error_info = tbot223_Exception.ExceptionTrackerHelper.get_system_info()
+    error_info = exception_tracker.ExceptionTrackerHelper.get_system_info()
 
     assert error_info["Current_Working_Directory"] == "<Permission Denied or Unavailable>"
 
 
 def test_get_system_info_collects_only_bounded_environment_variables(monkeypatch):
-    helper = tbot223_Exception.ExceptionTrackerHelper
+    helper = exception_tracker.ExceptionTrackerHelper
     large_value = "x" * (helper.ENVIRONMENT_VARIABLE_MAX_VALUE_LENGTH + 1)
     long_key = "K" * (helper.ENVIRONMENT_VARIABLE_MAX_VALUE_LENGTH + 1)
     list_value = ["ok", 1, True, None]
@@ -280,7 +288,7 @@ def test_get_system_info_collects_only_bounded_environment_variables(monkeypatch
             for index in range(helper.ENVIRONMENT_VARIABLE_MAX_COUNT + 1)
         }
     )
-    monkeypatch.setattr(tbot223_Exception.os, "environ", limited_environ)
+    monkeypatch.setattr(exception_tracker.os, "environ", limited_environ)
 
     info = helper.get_system_info()
     environment_variables = info["Environment_Variables"]
@@ -307,13 +315,13 @@ def test_get_system_info_collects_only_bounded_environment_variables(monkeypatch
     assert info["Virtual_Env"] == "None"
     assert len(environment_variables) == helper.ENVIRONMENT_VARIABLE_MAX_COUNT
 
-    monkeypatch.setattr(tbot223_Exception.os, "environ", {"VIRTUAL_ENV": "venv"})
+    monkeypatch.setattr(exception_tracker.os, "environ", {"VIRTUAL_ENV": "venv"})
     string_virtual_info = helper.get_system_info()
 
     assert string_virtual_info["Virtual_Env"] == "venv"
     assert string_virtual_info["Environment_Variables"]["VIRTUAL_ENV"] == "venv"
 
-    monkeypatch.setattr(tbot223_Exception.os, "environ", {"VIRTUAL_ENV": large_value})
+    monkeypatch.setattr(exception_tracker.os, "environ", {"VIRTUAL_ENV": large_value})
     large_virtual_info = helper.get_system_info()
 
     assert large_virtual_info["Virtual_Env"] == "None"
@@ -322,7 +330,7 @@ def test_get_system_info_collects_only_bounded_environment_variables(monkeypatch
     class _NonMappingEnvironment:
         environ = []
 
-    monkeypatch.setattr(tbot223_Exception, "os", _NonMappingEnvironment)
+    monkeypatch.setattr(exception_tracker, "os", _NonMappingEnvironment)
 
     assert helper._get_small_environment_variables() == {}
 
@@ -556,7 +564,7 @@ def test_get_exception_location_fallback(monkeypatch):
     def broken_extract_tb(*args, **kwargs):
         raise RuntimeError("traceback broke")
 
-    monkeypatch.setattr(tbot223_Exception.traceback, "extract_tb", broken_extract_tb)
+    monkeypatch.setattr(exception_tracker.traceback, "extract_tb", broken_extract_tb)
     result = tracker.get_exception_location(RuntimeError("boom"))
 
     assert result.status is ResultStatus.FAILURE

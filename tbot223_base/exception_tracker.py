@@ -6,12 +6,17 @@ import time
 import traceback
 import uuid
 from collections.abc import Iterable, Mapping
-from typing import Callable, Dict, List, Literal, Optional, ParamSpec, Tuple, TypeAlias, TypeGuard, TypeVar, Union, cast
+from typing import Callable, Dict, List, Literal, Optional, Tuple, TypeVar, Union, cast
 from functools import wraps
 import threading
 
+try:
+    from typing import ParamSpec, TypeAlias, TypeGuard
+except ImportError:  # pragma: no cover - exercised on Python 3.9 in CI.
+    from typing_extensions import ParamSpec, TypeAlias, TypeGuard
+
 # internal modules
-from tbot223_base.tbot223_Result import Result, ResultStatus
+from tbot223_base.result import Result, ResultStatus
 
 MaskPreset: TypeAlias = Literal["default", "private", "user_input", "params", "traceback", "system_info"]
 MaskPath: TypeAlias = Union[str, Tuple[str, ...]]
@@ -109,7 +114,7 @@ class ExceptionTrackerHelper():
         > - Mask or omit this payload before exposing it to untrusted users or external systems.
 
         ### Example
-        >>> from tbot223_base.tbot223_Exception import ExceptionTrackerHelper
+        >>> from tbot223_base.exception_tracker import ExceptionTrackerHelper
         >>> helper = ExceptionTrackerHelper()
         >>> info = helper.get_system_info()
         >>> print(info)
@@ -161,7 +166,7 @@ class ExceptionTrackerHelper():
         `dict` — A template dictionary for structured error information.
 
         ### Example
-        >>> from tbot223_base.tbot223_Exception import ExceptionTrackerHelper
+        >>> from tbot223_base.exception_tracker import ExceptionTrackerHelper
         >>> helper = ExceptionTrackerHelper()
         >>> error_info = helper.get_error_info_structure()
         >>> print(error_info)
@@ -224,7 +229,7 @@ class ExceptionTrackerHelper():
         `dict` — A template dictionary safe for public-facing error payloads.
 
         ### Example
-        >>> from tbot223_base.tbot223_Exception import ExceptionTrackerHelper
+        >>> from tbot223_base.exception_tracker import ExceptionTrackerHelper
         >>> helper = ExceptionTrackerHelper()
         >>> public_error_info = helper.get_public_error_info_structure()
         >>> print(public_error_info)
@@ -673,7 +678,7 @@ class ExceptionTracker():
         `Result` — Contains a formatted string: `'{file}', line {line}, in {function}`.
 
         ### Example
-        >>> from tbot223_base.tbot223_Exception import ExceptionTracker
+        >>> from tbot223_base.exception_tracker import ExceptionTracker
         >>> tracker = ExceptionTracker()
         >>> try:
         ...     1 / 0
@@ -746,7 +751,7 @@ class ExceptionTracker():
         > - A tuple of strings is always treated as one path.
 
         ### Example
-        >>> from tbot223_base.tbot223_Exception import ExceptionTracker
+        >>> from tbot223_base.exception_tracker import ExceptionTracker
         >>> tracker = ExceptionTracker()
         >>> try:
         >>>     1 / 0
@@ -837,7 +842,7 @@ class ExceptionTracker():
         > - `error` is accepted for API symmetry, but its raw message is not exposed unless you pass a safe `public_message`.
 
         ### Example
-        >>> from tbot223_base.tbot223_Exception import ExceptionTracker
+        >>> from tbot223_base.exception_tracker import ExceptionTracker
         >>> tracker = ExceptionTracker()
         >>> try:
         >>>     1 / 0
@@ -910,7 +915,7 @@ class ExceptionTracker():
         > - For public-safe failure results, use `get_public_exception_return()` instead.
 
         ### Example
-        >>> from tbot223_base.tbot223_Exception import ExceptionTracker
+        >>> from tbot223_base.exception_tracker import ExceptionTracker
         >>> tracker = ExceptionTracker()
         >>> try:
         ...     1 / 0
@@ -954,7 +959,7 @@ class ExceptionTracker():
         > - It does not collect traceback text, local variables, params, or system information.
 
         ### Example
-        >>> from tbot223_base.tbot223_Exception import ExceptionTracker
+        >>> from tbot223_base.exception_tracker import ExceptionTracker
         >>> tracker = ExceptionTracker()
         >>> try:
         ...     1 / 0
@@ -995,7 +1000,7 @@ class ExceptionTracker():
         > Example: `{ "ZeroDivisionError": 1001, "ValueError": 1002 }`.
 
         ### Example
-        >>> from tbot223_base.tbot223_Exception import ExceptionTracker
+        >>> from tbot223_base.exception_tracker import ExceptionTracker
         >>> tracker = ExceptionTracker()
         >>> error_id_map = {"ZeroDivisionError": 1001, "ValueError": 1002}
         >>> try:
@@ -1052,7 +1057,7 @@ class ExceptionTrackerDecorator():
     > - Use `mask_presets=("private", "traceback", "system_info")` or explicit `mask_paths` before exposing decorator results outside a trusted boundary.
 
     ### Example
-    >>> from tbot223_base.tbot223_Exception import ExceptionTracker, ExceptionTrackerDecorator
+    >>> from tbot223_base.exception_tracker import ExceptionTracker, ExceptionTrackerDecorator
     >>> tracker = ExceptionTracker()
     >>> def risky_function(x, y):
     ...     return x / y

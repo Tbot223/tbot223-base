@@ -6,6 +6,8 @@
 
 This reference covers `ExceptionTracker`, `ExceptionTrackerDecorator`, masking, and safe context capture.
 
+For stability rules around debug/public payload shapes, see the [API contract](../../contracts/en/human/api-contract.md).
+
 ## Two Payload Paths
 
 | Path | Methods | Intended use |
@@ -14,6 +16,10 @@ This reference covers `ExceptionTracker`, `ExceptionTrackerDecorator`, masking, 
 | Public-safe | `get_public_exception_info()`, `get_public_exception_return()` | API responses, UI surfaces, or untrusted boundaries. |
 
 The public-safe path does not collect traceback text, local variables, params, or system information.
+
+## Import Path
+
+Import `ExceptionTracker` and `ExceptionTrackerDecorator` from `tbot223_base.exception_tracker`.
 
 ## Debug Context Capture
 
@@ -48,7 +54,7 @@ Explicit `mask_paths` can also mask dot paths such as `"location.origin"` or tup
 ## Public Example
 
 ```python
-from tbot223_base.tbot223_Exception import ExceptionTracker
+from tbot223_base.exception_tracker import ExceptionTracker
 
 tracker = ExceptionTracker()
 

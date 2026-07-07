@@ -306,7 +306,7 @@ Example은 `>>>` REPL 형식으로 작성한다.
 
 ```markdown
 ### Example
->>> from tbot223_base.tbot223_Result import Result
+>>> from tbot223_base.result import Result
 >>> result = Result(success=True, error=None, context="Demo", data={"key": "value"})
 >>> print(result.success)  # True
 >>> print(result.data["key"])  # value
@@ -354,7 +354,7 @@ def unwrap_or(self, default: _DefaultT) -> Union[_DataT, _DefaultT]:
     `Union[_DataT, _DefaultT]` — The stored payload if successful, otherwise `default`.
 
     ### Example
-    >>> from tbot223_base.tbot223_Result import Result
+    >>> from tbot223_base.result import Result
     >>> result = Result(success=False, error="Not Found", context="FetchData", data=None)
     >>> print(result.unwrap_or({"key": "default"}))  # {'key': 'default'}
     """
@@ -412,7 +412,7 @@ def get_exception_info(
     > Unknown preset names and invalid mask paths are ignored rather than rejected.
 
     ### Example
-    >>> from tbot223_base.tbot223_Exception import ExceptionTracker
+    >>> from tbot223_base.exception_tracker import ExceptionTracker
     >>> tracker = ExceptionTracker()
     >>> try:
     ...     1 / 0
@@ -444,7 +444,7 @@ def unwrap(self) -> _DataT:
     > - `ResultUnwrapException` — Raised when `status` is not `ResultStatus.SUCCESS`.
 
     ### Example
-    >>> from tbot223_base.tbot223_Result import Result
+    >>> from tbot223_base.result import Result
     >>> result = Result(success=True, error=None, context="FetchData", data=42)
     >>> print(result.unwrap())  # 42
     """

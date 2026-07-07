@@ -11,6 +11,7 @@ This directory contains user-facing documentation and repository writing contrac
 
 - English: [en/README.md](en/README.md)
 - Korean: [ko/README.md](ko/README.md)
+- Package and CI guide: [en](en/guides/package-and-ci.md), [ko](ko/guides/package-and-ci.md)
 
 ## Contract Docs
 

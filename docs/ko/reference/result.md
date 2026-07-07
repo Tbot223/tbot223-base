@@ -16,7 +16,7 @@
 | `ResultStatus.FAILURE` | 작업이 실패했다. |
 | `ResultStatus.CANCELLED` | 작업이 취소되었거나 실행되지 않았다. |
 
-`ResultStatus.normalize()`는 `ResultStatus`, legacy `bool`, `None`, 유효한 status string을 받는다.
+`ResultStatus.normalize()`는 `ResultStatus`, tri-state shorthand 값(`bool` 또는 `None`), 유효한 status string을 받는다.
 
 ## Result
 
@@ -29,13 +29,17 @@
 | `context` | `Optional[str]` | 작업 맥락. |
 | `data` | `T` | 작업이 반환한 payload. |
 
-Legacy `success=` 생성자 인자는 계속 지원된다. 새 코드는 `status=ResultStatus...`를 우선 사용한다.
+`success=` 생성자 인자는 tri-state shorthand로 지원된다. 명시적인 enum 형태가 필요하면 새 코드는 `status=ResultStatus...`를 우선 사용한다.
 
 Payload 타입을 알고 있다면 `Result[T]`를 사용한다. `unwrap()`과 `expect()`는 `T`를 반환하고, `unwrap_or(default)`는 `T` 또는 default 값 타입을 반환한다.
 
+## Import 경로
+
+`Result`, `ResultStatus`, `ResultUnwrapException`은 `tbot223_base.result`에서 import한다.
+
 ## Predicate
 
-- `result.success`: legacy tri-state 호환 property이며 `True`, `False`, `None`을 반환한다.
+- `result.success`: tri-state shorthand property이며 `True`, `False`, `None`을 반환한다.
 - `result.is_success`: `ResultStatus.SUCCESS`일 때만 `True`.
 - `result.is_failure`: `ResultStatus.FAILURE`일 때만 `True`.
 - `result.is_cancelled`: `ResultStatus.CANCELLED`일 때만 `True`.
@@ -49,7 +53,7 @@ Payload 타입을 알고 있다면 `Result[T]`를 사용한다. `unwrap()`과 `e
 ## Example
 
 ```python
-from tbot223_base.tbot223_Result import Result, ResultStatus
+from tbot223_base.result import Result, ResultStatus
 
 result: Result[dict[str, str]] = Result(ResultStatus.FAILURE, "not found", "LoadProfile", None)
 

@@ -21,7 +21,7 @@ class ResultStatus(str, Enum):
     @classmethod
     def normalize(cls, value: object) -> "ResultStatus":
         """
-        Normalize legacy and string input into a `ResultStatus`.
+        Normalize `ResultStatus`, tri-state shorthand, and string input into a `ResultStatus`.
         """
         if isinstance(value, cls):
             return value
@@ -61,7 +61,7 @@ class ResultUnwrapException(RuntimeError):
         `None` — Initializes the exception object.
 
         ### Example
-        >>> from tbot223_base.tbot223_Result import Result, ResultStatus, ResultUnwrapException
+        >>> from tbot223_base.result import Result, ResultStatus, ResultUnwrapException
         >>> try:
         >>>     result = Result(status=ResultStatus.FAILURE, error="Some error", context="TestContext", data=None)
         >>>     result.unwrap()
@@ -87,8 +87,8 @@ class Result(_ResultBase[_DataT], Generic[_DataT]):
 
     `Result[_DataT]` stores an explicit `status` based on `ResultStatus`, so success,
     failure, and cancelled states are modeled directly instead of sharing one
-    `Optional[bool]` field. For compatibility, `success=` input and the
-    `result.success` property are still supported.
+    `Optional[bool]` field. The `success=` input and `result.success` property
+    are supported tri-state shorthand APIs.
 
     - **(R)** = Required argument
     - **(O)** = Optional argument (has a default value)
@@ -106,12 +106,12 @@ class Result(_ResultBase[_DataT], Generic[_DataT]):
     > - Use `Result[T]` when the payload type is known.
     > - `unwrap()`, `expect()`, and `unwrap_or()` are convenience methods.
     > - `unwrap()` and `expect()` return `_DataT`.
-    > - `success=` remains supported for legacy calls and is normalized into `status`.
-    > - `result.success` remains available as a compatibility property that returns `True`, `False`, or `None`.
+    > - `success=` is supported as tri-state shorthand and is normalized into `status`.
+    > - `result.success` returns the tri-state shorthand value `True`, `False`, or `None`.
     > - In most code, directly checking `status`, `error`, and `data` is recommended.
 
     ### Example
-    >>> from tbot223_base.tbot223_Result import Result, ResultStatus
+    >>> from tbot223_base.result import Result, ResultStatus
     >>> result: Result[dict[str, str]] = Result(status=ResultStatus.SUCCESS, error=None, context="FetchData", data={"key": "value"})
     >>> if result.is_success:
     >>>     print("Operation succeeded with data:", result.data)
@@ -130,7 +130,7 @@ class Result(_ResultBase[_DataT], Generic[_DataT]):
     ) -> "Result[_DataT]":
         if success is not _RESULT_SENTINEL:
             if status is not _RESULT_SENTINEL:
-                raise TypeError("Use either `status` or legacy `success`, not both.")
+                raise TypeError("Use either `status` or `success` shorthand, not both.")
             status = success
 
         if status is _RESULT_SENTINEL:
@@ -142,7 +142,7 @@ class Result(_ResultBase[_DataT], Generic[_DataT]):
     @property
     def success(self) -> Optional[bool]:
         """
-        Compatibility property that maps `status` back to legacy tri-state success.
+        Return the tri-state shorthand value for the current `status`.
         """
         if self.status is ResultStatus.SUCCESS:
             return True
@@ -185,7 +185,7 @@ class Result(_ResultBase[_DataT], Generic[_DataT]):
         `_DataT` — The stored payload.
 
         ### Example
-        >>> from tbot223_base.tbot223_Result import Result, ResultStatus
+        >>> from tbot223_base.result import Result, ResultStatus
         >>> result: Result[dict[str, str]] = Result(status=ResultStatus.SUCCESS, error=None, context="FetchData", data={"key": "value"})
         >>> data = result.unwrap()
         >>> print(data)
@@ -212,7 +212,7 @@ class Result(_ResultBase[_DataT], Generic[_DataT]):
         `_DataT` — The stored payload.
 
         ### Example
-        >>> from tbot223_base.tbot223_Result import Result, ResultStatus
+        >>> from tbot223_base.result import Result, ResultStatus
         >>> result: Result[dict[str, str]] = Result(status=ResultStatus.SUCCESS, error=None, context="FetchData", data={"key": "value"})
         >>> data = result.expect("Should not fail")
         >>> print(data)
@@ -237,7 +237,7 @@ class Result(_ResultBase[_DataT], Generic[_DataT]):
         `Union[_DataT, _DefaultT]` — The stored payload if successful, otherwise `default`.
 
         ### Example
-        >>> from tbot223_base.tbot223_Result import Result, ResultStatus
+        >>> from tbot223_base.result import Result, ResultStatus
         >>> result: Result[dict[str, str]] = Result(status=ResultStatus.FAILURE, error="Not Found", context="FetchData", data=None)
         >>> data = result.unwrap_or({"key": "default_value"})
         >>> print(data)

@@ -11,6 +11,7 @@ This directory is the entry point for repository writing contracts.
 
 - Documentation contract: general Markdown docs such as README files, guides, references, release notes, and contract docs.
 - Docstring contract: Python docstrings.
+- API contract: public import paths, `Result`, and `ExceptionTracker` payload shapes.
 
 ## Start Here
 

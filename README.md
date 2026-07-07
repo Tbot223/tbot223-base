@@ -15,11 +15,12 @@
 - [Korean docs](docs/ko/README.md)
 - [English docs](docs/en/README.md)
 - [Contract docs](docs/contracts/README.md)
+- [Package and CI guide](docs/ko/guides/package-and-ci.md)
 
 ## Quick Example
 
 ```python
-from tbot223_base.tbot223_Result import Result, ResultStatus
+from tbot223_base.result import Result, ResultStatus
 
 result: Result[dict[str, int]] = Result(
     status=ResultStatus.SUCCESS,
@@ -35,7 +36,11 @@ if result.is_success:
 ## Development Check
 
 ```bash
+python -m pip install -e ".[test]"
+```
+
+```bash
 pytest
 ```
 
-현재 테스트는 `Result` 상태 모델, unwrap 계열 동작, `ExceptionTracker` debug/public 분리, decorator 기반 실패 반환을 확인한다.
+현재 테스트는 `Result` 상태 모델, unwrap 계열 동작, `ExceptionTracker` debug/public 분리, decorator 기반 실패 반환을 확인한다. GitHub Actions의 optional compatibility workflow는 Python 3.9부터 3.14까지 같은 테스트를 실행한다.
