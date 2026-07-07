@@ -1,7 +1,7 @@
 [English](en/README.md)
 [한국어 (Korean)](ko/README.md)
 
-> Runtime baseline: current `dev` branch checkout with `tbot223_base.__version__ == "0.1.0"`.
+> Runtime baseline: package version 0.1.0 (`tbot223_base.__version__ == "0.1.0"`).
 
 # Documentation
 

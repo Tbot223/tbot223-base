@@ -1,6 +1,6 @@
 [English](../../en/guides/package-and-ci.md)
 
-> Runtime baseline: current `dev` branch checkout with `tbot223_base.__version__ == "0.1.0"`.
+> 런타임 기준: package version 0.1.0 (`tbot223_base.__version__ == "0.1.0"`).
 
 # Package and CI Guide
 
@@ -116,7 +116,14 @@ Package를 upload하기 전에 다음을 검증한다.
 - source distribution과 wheel distribution이 정상적으로 build된다.
 - 생성된 distribution을 `twine check`가 통과시킨다.
 
-Publish job은 GitHub OIDC 기반 PyPI Trusted Publishing을 사용한다. 첫 release를 publish하기 전에 이 repository, workflow file, `pypi` environment에 맞춰 PyPI trusted publisher를 설정해야 한다.
+Publish job은 GitHub OIDC 기반 PyPI Trusted Publishing을 사용한다. 첫 release를 publish하기 전에 PyPI trusted publisher를 설정해야 한다.
+
+PyPI Trusted Publisher에는 다음 값을 사용한다.
+
+- Repository owner: `Tbot223`
+- Repository name: `tbot223-base`
+- Workflow: `publish.yml`
+- Environment name: `pypi`
 
 ## 릴리스 체크리스트
 

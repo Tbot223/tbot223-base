@@ -1,6 +1,6 @@
 [한국어 (Korean)](../../ko/guides/getting-started.md)
 
-> Runtime baseline: current `dev` branch checkout with `tbot223_base.__version__ == "0.1.0"`.
+> Runtime baseline: package version 0.1.0 (`tbot223_base.__version__ == "0.1.0"`).
 
 # Getting Started
 

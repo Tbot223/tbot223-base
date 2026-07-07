@@ -2,7 +2,7 @@
 
 # Release Notes
 
-## 0.1.0 / Current Dev Checkout
+## 0.1.0
 
 ### Added
 
@@ -22,6 +22,7 @@
 ### Changed
 
 - Debug exception context now stores only small safe copies and replaces heavy values with `"<BLOCKED>"`.
+- `Result` keeps `Result[T]` runtime subscription while avoiding a Python 3.10 `NamedTuple`/`Generic` import failure.
 - Pre-release non-canonical module paths were removed in favor of canonical `tbot223_base.result` and `tbot223_base.exception_tracker`.
 - `pyproject.toml` now uses `tbot223_base.__version__` as the dynamic package version source and declares the optional `test` dependency group.
 - `pyproject.toml` now declares optional `release` and `dev` dependency groups for repeatable local checks.

@@ -1,6 +1,6 @@
 # external modules
 from enum import Enum
-from typing import Generic, NamedTuple, Optional, TypeVar, Union, cast
+from typing import TYPE_CHECKING, Generic, NamedTuple, Optional, TypeVar, Union, cast
 
 # internal modules
 
@@ -74,11 +74,18 @@ class ResultUnwrapException(RuntimeError):
         self.data = data
 
 
-class _ResultBase(NamedTuple, Generic[_DataT]):
-    status: ResultStatus
-    error: Optional[str]
-    context: Optional[str]
-    data: _DataT
+if TYPE_CHECKING:
+    class _ResultBase(NamedTuple, Generic[_DataT]):
+        status: ResultStatus
+        error: Optional[str]
+        context: Optional[str]
+        data: _DataT
+else:
+    class _ResultBase(NamedTuple):
+        status: ResultStatus
+        error: Optional[str]
+        context: Optional[str]
+        data: object
 
 
 class Result(_ResultBase[_DataT], Generic[_DataT]):

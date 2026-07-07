@@ -2,7 +2,7 @@
 
 # 릴리스 노트
 
-## 0.1.0 / Current Dev Checkout
+## 0.1.0
 
 ### Added
 
@@ -22,6 +22,7 @@
 ### Changed
 
 - Debug exception context가 raw object reference 대신 작은 safe copy만 저장하고 무거운 값은 `"<BLOCKED>"`로 대체한다.
+- `Result`가 `Result[T]` runtime subscription을 유지하면서 Python 3.10의 `NamedTuple`/`Generic` import 실패를 피하도록 정리했다.
 - Pre-release non-canonical module path는 제거하고 canonical `tbot223_base.result`, `tbot223_base.exception_tracker`만 사용한다.
 - `pyproject.toml`이 `tbot223_base.__version__`을 dynamic package version source로 사용하고 optional `test` dependency group을 정의한다.
 - 반복 가능한 local check를 위해 optional `release`, `dev` dependency group을 정의한다.
