@@ -18,11 +18,12 @@ jobs:
         with:
           fetch-depth: 0
 
-      - name: Validate tag, branch, and package version
+      - name: Validate tag, release type, branch, and package version
         run: |
           set -euo pipefail
 
           TAG_NAME="${{ github.event.release.tag_name }}"
+          RELEASE_IS_PRERELEASE="${{ github.event.release.prerelease }}"
           TAG_PATTERN='^v[0-9]+\.[0-9]+\.[0-9]+(rc[0-9]+)?$'
 
           if [[ -z "${TAG_NAME}" ]]; then
@@ -31,7 +32,17 @@ jobs:
           fi
 
           if [[ ! "${TAG_NAME}" =~ ${TAG_PATTERN} ]]; then
-            echo "Release tag must use stable vMAJOR.MINOR.PATCH or release-candidate vMAJOR.MINOR.PATCHrcN format, for example v1.0.0rc1."
+            echo "Release tag must use stable vMAJOR.MINOR.PATCH or release-candidate vMAJOR.MINOR.PATCHrcN format, for example v1.0.0rc2."
+            exit 1
+          fi
+
+          if [[ "${TAG_NAME}" =~ rc[0-9]+$ ]]; then
+            if [[ "${RELEASE_IS_PRERELEASE}" != "true" ]]; then
+              echo "Release-candidate tag ${TAG_NAME} must be published as a GitHub prerelease."
+              exit 1
+            fi
+          elif [[ "${RELEASE_IS_PRERELEASE}" != "false" ]]; then
+            echo "Stable tag ${TAG_NAME} must not be published as a GitHub prerelease."
             exit 1
           fi
 
@@ -89,6 +100,13 @@ jobs:
 
       - name: Check package metadata
         run: python -m twine check dist/*
+
+      - name: Check installed wheel
+        run: |
+          python -m venv /tmp/tbot223-base-wheel-smoke
+          /tmp/tbot223-base-wheel-smoke/bin/python -m pip install --no-deps dist/*.whl
+          cd /tmp
+          /tmp/tbot223-base-wheel-smoke/bin/python -c 'import json; import tbot223_base; from tbot223_base import ExceptionTracker, Result, ResultStatus; assert Result(ResultStatus.SUCCESS, None, "WheelSmoke", 1).unwrap() == 1; payload = ExceptionTracker().get_public_exception_return(RuntimeError("internal"), tags={"nested": [1, {"safe": True}]}); json.dumps(payload.data, allow_nan=False); print(tbot223_base.__version__)'
 
       - name: Store package distributions
         uses: actions/upload-artifact@v4

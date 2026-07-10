@@ -47,6 +47,9 @@ Issues = "https://github.com/Tbot223/tbot223-base/issues"
 test = [
     "pytest>=8",
 ]
+type = [
+    "mypy>=1.15",
+]
 release = [
     "build>=1",
     "setuptools>=77",
@@ -56,6 +59,7 @@ release = [
 ]
 dev = [
     "build>=1",
+    "mypy>=1.15",
     "pytest>=8",
     "setuptools>=77",
     "tomli>=2; python_version < '3.11'",
@@ -74,3 +78,10 @@ version = { attr = "tbot223_base.__version__" }
 
 [tool.pytest.ini_options]
 testpaths = ["tests"]
+
+[tool.mypy]
+python_version = "3.10"
+files = ["tbot223_base", "tests/typecheck"]
+show_error_codes = true
+warn_unused_configs = true
+warn_unused_ignores = true

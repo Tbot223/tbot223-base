@@ -1,6 +1,6 @@
 [English](../../en/llm/api-contract.md)
 
-> Contract revision: 2026-07-07.
+> Contract revision: 2026-07-10.
 
 # API Contract for LLM
 
@@ -22,8 +22,10 @@
 5. public/debug payload shape가 바뀌면 완료로 보기 전에 테스트를 갱신한다.
 6. public payload에는 debug-only field가 들어가지 않게 한다.
 7. debug payload safety behavior를 명시적으로 유지한다: safe copy, `"<BLOCKED>"`, capture 이후 masking.
-8. 지원 Python version range가 바뀌면 `pyproject.toml`, CI workflow, 사용자 문서를 함께 갱신한다.
-9. 현재 checkout에서 가능한 local verification command를 실행한다.
+8. Public tag value를 bounded JSON-safe shape로 유지하고 caller-owned object reference를 보존하지 않는다.
+9. Synchronous/async decorator behavior를 executable test와 consumer typing check로 함께 고정한다.
+10. 지원 Python version range가 바뀌면 `pyproject.toml`, CI workflow, 사용자 문서를 함께 갱신한다.
+11. 현재 checkout에서 가능한 local verification command를 실행한다.
 
 ## 테스트 기대값
 
@@ -31,6 +33,7 @@ API에 민감한 변경은 다음을 실행하는 것이 좋다.
 
 ```bash
 pytest -q
+python -m mypy
 python -m py_compile tbot223_base/__init__.py tbot223_base/result.py tbot223_base/exception_tracker.py
 git diff --check
 ```
@@ -40,6 +43,7 @@ CI를 사용할 수 있으면 release-like checkpoint 전에 optional Python com
 ## 하지 말 것
 
 - Public payload에 traceback, params, user input, local variables, system information을 노출하지 않는다.
+- Public tag 안에 지원하지 않는 caller-owned object를 보존하지 않는다.
 - API 계약에 문서화하지 않은 alternate public import path를 추가하지 않는다.
 - Breaking change를 문서화하지 않고 `ResultStatus` string value를 바꾸지 않는다.
 - Payload behavior를 바꾸면서 동작 테스트 없이 문서만 갱신하지 않는다.

@@ -6,13 +6,14 @@ usage() {
 Usage:
   scripts/check-release-readiness.sh [--strict-release] [vMAJOR.MINOR.PATCH|vMAJOR.MINOR.PATCHrcN]
 
-Checks tests, package metadata, GitHub Actions workflow syntax, source/wheel
-builds, twine metadata validation, and release tag/version consistency.
+Checks tests, typing, package metadata, GitHub Actions workflow syntax,
+source/wheel builds, installed-wheel behavior, twine metadata validation,
+and release tag/version consistency.
 
 Examples:
   scripts/check-release-readiness.sh
-  scripts/check-release-readiness.sh v1.0.0rc1
-  scripts/check-release-readiness.sh --strict-release v1.0.0rc1
+  scripts/check-release-readiness.sh v1.0.0rc2
+  scripts/check-release-readiness.sh --strict-release v1.0.0rc2
 USAGE
 }
 
@@ -54,7 +55,7 @@ require_command() {
 
   if ! command -v "${command_name}" >/dev/null 2>&1; then
     echo "Missing required command: ${command_name}" >&2
-    echo "Install local release tools with: python -m pip install -e \".[test,release]\"" >&2
+    echo "Install local release tools with: python -m pip install -e \".[test,type,release]\"" >&2
     echo "For actionlint, use the Docker check or install the actionlint binary on the host." >&2
     echo "Docker check: docker compose run --build --rm check" >&2
     exit 1
@@ -74,7 +75,7 @@ if [[ -z "${RELEASE_TAG}" ]]; then
 fi
 
 if [[ ! "${RELEASE_TAG}" =~ ${RELEASE_TAG_REGEX} ]]; then
-  echo "Release tag must use stable vMAJOR.MINOR.PATCH or release-candidate vMAJOR.MINOR.PATCHrcN format, for example v1.0.0rc1." >&2
+  echo "Release tag must use stable vMAJOR.MINOR.PATCH or release-candidate vMAJOR.MINOR.PATCHrcN format, for example v1.0.0rc2." >&2
   exit 1
 fi
 
@@ -104,6 +105,7 @@ assert project["dynamic"] == ["version"]
 assert project["requires-python"] == ">=3.10"
 assert project["license"] == "Apache-2.0"
 assert project["license-files"] == ["LICENSE"]
+assert project["optional-dependencies"]["type"] == ["mypy>=1.15"]
 assert dynamic_version == "tbot223_base.__version__"
 
 print(f"metadata baseline ok: {project['name']} {__version__}")
@@ -113,6 +115,19 @@ echo "Checking local release tag state..."
 if git rev-parse --git-dir >/dev/null 2>&1; then
   if git rev-parse -q --verify "refs/tags/${RELEASE_TAG}^{commit}" >/dev/null; then
     TAG_COMMIT="$(git rev-list -n 1 "${RELEASE_TAG}")"
+
+    if [[ "${STRICT_RELEASE}" -eq 1 ]]; then
+      HEAD_COMMIT="$(git rev-parse HEAD)"
+      if [[ "${TAG_COMMIT}" != "${HEAD_COMMIT}" ]]; then
+        echo "Strict release mode requires ${RELEASE_TAG} to point at HEAD." >&2
+        exit 1
+      fi
+
+      if [[ -n "$(git status --porcelain --untracked-files=normal)" ]]; then
+        echo "Strict release mode requires a clean working tree." >&2
+        exit 1
+      fi
+    fi
 
     if git rev-parse -q --verify "refs/remotes/origin/main" >/dev/null; then
       git merge-base --is-ancestor "${TAG_COMMIT}" origin/main
@@ -134,6 +149,7 @@ if git rev-parse --git-dir >/dev/null 2>&1; then
 fi
 
 require_command actionlint
+require_command mypy
 
 echo "Checking Python syntax..."
 python -m py_compile \
@@ -143,6 +159,9 @@ python -m py_compile \
 
 echo "Running tests..."
 pytest -q
+
+echo "Checking package typing..."
+mypy
 
 echo "Checking GitHub Actions workflows..."
 actionlint .github/workflows/*.yml
@@ -174,6 +193,7 @@ python - <<'PY' "${TMP_DIR}/dist" "${PACKAGE_VERSION}"
 import email.parser
 import pathlib
 import sys
+import tarfile
 import zipfile
 
 dist_dir = pathlib.Path(sys.argv[1])
@@ -185,8 +205,22 @@ assert len(wheels) == 1, wheels
 assert len(sdists) == 1, sdists
 
 with zipfile.ZipFile(wheels[0]) as wheel:
-    metadata_name = next(name for name in wheel.namelist() if name.endswith(".dist-info/METADATA"))
+    wheel_names = wheel.namelist()
+    metadata_name = next(name for name in wheel_names if name.endswith(".dist-info/METADATA"))
     metadata = email.parser.Parser().parsestr(wheel.read(metadata_name).decode())
+    assert "tbot223_base/py.typed" in wheel_names
+
+with tarfile.open(sdists[0]) as sdist:
+    sdist_names = sdist.getnames()
+    for required_path in (
+        "README.ko.md",
+        "docs/en/README.md",
+        "examples/result/result_status_flow.py",
+        "scripts/check-release-readiness.sh",
+        "tests/conftest.py",
+        "tests/typecheck/public_api.py",
+    ):
+        assert any(name.endswith(f"/{required_path}") for name in sdist_names), required_path
 
 assert metadata["Name"] == "tbot223-base"
 assert metadata["Version"] == expected_version
@@ -196,5 +230,32 @@ print(wheels[0].name)
 print(sdists[0].name)
 print("distribution metadata ok")
 PY
+
+echo "Checking installed wheel behavior..."
+python -m venv "${TMP_DIR}/venv"
+"${TMP_DIR}/venv/bin/python" -m pip install --no-deps "${TMP_DIR}"/dist/*.whl
+
+(
+  cd "${TMP_DIR}"
+  "${TMP_DIR}/venv/bin/python" - <<'PY'
+import json
+import pathlib
+import sys
+
+import tbot223_base
+from tbot223_base import ExceptionTracker, Result, ResultStatus
+
+assert pathlib.Path(tbot223_base.__file__).is_relative_to(pathlib.Path(sys.prefix))
+assert Result(ResultStatus.SUCCESS, None, "WheelSmoke", 1).unwrap() == 1
+
+public_result = ExceptionTracker().get_public_exception_return(
+    RuntimeError("internal"),
+    tags={"nested": [1, {"safe": True}]},
+)
+json.dumps(public_result.data, allow_nan=False)
+
+print(f"installed wheel ok: {tbot223_base.__version__}")
+PY
+)
 
 echo "Release readiness checks passed for ${RELEASE_TAG}."

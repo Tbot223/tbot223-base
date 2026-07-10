@@ -1,6 +1,6 @@
 [한국어 (Korean)](../../ko/human/api-contract.md)
 
-> Contract revision: 2026-07-07.
+> Contract revision: 2026-07-10.
 
 # API Contract
 
@@ -84,6 +84,10 @@ The public payload MUST use this top-level shape:
 
 Raw exception messages MUST NOT be exposed through the public payload unless the caller explicitly passes a safe `public_message`.
 
+Public tag keys MUST be normalized to bounded strings. Public tag values MUST be copied into a bounded JSON-safe shape without retaining caller-owned object references. Unsupported, oversized, non-finite, cyclic, or too-deep values MUST be replaced with `"<BLOCKED>"`.
+
+`ExceptionTrackerDecorator` MUST convert uncaught exceptions from synchronous functions, coroutine functions, and awaited results into failure `Result` objects. Exceptions raised during later generator or async-generator iteration are outside this decorator contract.
+
 ## 7. Debug Safety Rules
 
 Debug context capture MUST avoid retaining raw object references.
@@ -105,9 +109,10 @@ Tests SHOULD cover:
 - `ResultStatus` normalization and `success=` shorthand behavior.
 - Debug payload masking and safe context capture.
 - Public payload minimal fields and absence of debug-only fields.
-- Decorator conversion of uncaught exceptions into failure `Result` objects.
+- Public tag JSON serialization and absence of caller-owned object references.
+- Decorator conversion of synchronous and async uncaught exceptions into failure `Result` objects.
 
-The Python compatibility CI SHOULD run the test suite across the declared Python version matrix on push, pull request, manual dispatch, and before release-like checkpoints.
+The Python compatibility CI SHOULD run the test suite and package type check across the declared Python version matrix on push, pull request, manual dispatch, and before release-like checkpoints.
 
 ## 9. Final Checklist
 

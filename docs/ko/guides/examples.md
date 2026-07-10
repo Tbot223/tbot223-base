@@ -1,6 +1,6 @@
 [English](../../en/guides/examples.md)
 
-> 런타임 기준: package version 1.0.0rc1 (`tbot223_base.__version__ == "1.0.0rc1"`).
+> 런타임 기준: package version 1.0.0rc2 (`tbot223_base.__version__ == "1.0.0rc2"`).
 
 # 실행 가능한 예시
 

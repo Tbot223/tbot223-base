@@ -1,6 +1,6 @@
 [한국어 (Korean)](../../ko/guides/package-and-ci.md)
 
-> Runtime baseline: package version 1.0.0rc1 (`tbot223_base.__version__ == "1.0.0rc1"`).
+> Runtime baseline: package version 1.0.0rc2 (`tbot223_base.__version__ == "1.0.0rc2"`).
 
 # Package and CI Guide
 
@@ -13,13 +13,14 @@ Release, CI, Docker, and repository maintenance commands live here instead of th
 Use editable install when you want local imports to behave like an installed package while still editing the checkout.
 
 ```bash
-python -m pip install -e ".[test]"
+python -m pip install -e ".[test,type]"
 ```
 
 Then run the tests.
 
 ```bash
 pytest -q
+python -m mypy
 ```
 
 ## What `pyproject.toml` Does
@@ -32,35 +33,37 @@ In this repository it defines:
 - package metadata such as name, README, license, authors, classifiers, project URLs, and `requires-python`.
 - dynamic package version loading from `tbot223_base.__version__`.
 - the optional `test` dependency group.
+- the optional `type` dependency group for mypy.
 - the optional `release` dependency group for build and metadata validation tools.
-- the optional `dev` dependency group for test and release tooling together.
+- the optional `dev` dependency group for test, type, and release tooling together.
 - package discovery for `tbot223_base`.
 - inclusion of `py.typed` for type-aware tooling.
 - pytest's default `tests` path.
+- mypy's package and public consumer-check targets plus Python 3.10 typing baseline.
 
 ## Local Release Tools
 
 Install the reusable release tooling from the package extras.
 
 ```bash
-python -m pip install -e ".[test,release]"
+python -m pip install -e ".[test,type,release]"
 ```
 
 Then run the release readiness check.
 
 ```bash
-scripts/check-release-readiness.sh v1.0.0rc1
+scripts/check-release-readiness.sh v1.0.0rc2
 ```
 
-Use strict release mode after the `v1.0.0rc1` tag exists locally and `origin/main` is available.
+Use strict release mode after the `v1.0.0rc2` tag exists locally, points at `HEAD`, the working tree is clean, and `origin/main` is available.
 
 ```bash
-scripts/check-release-readiness.sh --strict-release v1.0.0rc1
+scripts/check-release-readiness.sh --strict-release v1.0.0rc2
 ```
 
 Release gates accept stable `vMAJOR.MINOR.PATCH` tags and release-candidate `vMAJOR.MINOR.PATCHrcN` tags. After removing the leading `v`, the tag text must still exactly match `tbot223_base.__version__`.
 
-The script runs metadata checks, Python compile checks, `pytest`, `actionlint`, `git diff --check`, temporary source/wheel builds, `twine check`, and distribution metadata assertions.
+The script runs metadata checks, Python compile checks, `pytest`, mypy, `actionlint`, `git diff --check`, temporary source/wheel builds, `twine check`, distribution metadata assertions, and an isolated installed-wheel smoke check.
 
 For host-only use, install the `actionlint` binary separately. The Docker check already includes it.
 
@@ -76,7 +79,7 @@ docker compose run --build --rm test
 docker compose run --build --rm check
 ```
 
-The `test` service runs only `pytest -q`. The `check` service runs `scripts/check-release-readiness.sh v1.0.0rc1` inside an image that installs the `test` and `release` dependency groups and includes `actionlint`.
+The `test` service runs only `pytest -q`. The `check` service runs `scripts/check-release-readiness.sh v1.0.0rc2` inside an image that installs the `test`, `type`, and `release` dependency groups and includes `actionlint`.
 
 ## Compatibility CI
 
@@ -92,10 +95,11 @@ The current matrix is:
 - Python 3.13
 - Python 3.14
 
-Each job installs the package with test dependencies and runs:
+Each job installs the package with test and type dependencies and runs:
 
 ```bash
 pytest -q
+python -m mypy
 ```
 
 ## When To Run It
@@ -111,12 +115,14 @@ The workflow at `.github/workflows/publish.yml` runs only when a GitHub Release 
 Before uploading anything, it validates:
 
 - the release has a tag.
-- the tag uses stable `vMAJOR.MINOR.PATCH` or release-candidate `vMAJOR.MINOR.PATCHrcN` format, for example `v1.0.0rc1`.
+- the tag uses stable `vMAJOR.MINOR.PATCH` or release-candidate `vMAJOR.MINOR.PATCHrcN` format, for example `v1.0.0rc2`.
+- release-candidate tags are published as GitHub prereleases, while stable tags are not.
 - the tag points to a commit contained in `origin/main`.
 - the tag version matches `tbot223_base.__version__` after removing the leading `v`.
 - the Python compatibility matrix passes.
 - source and wheel distributions build successfully.
 - `twine check` accepts the generated distributions.
+- the built wheel installs in an isolated environment and passes the import/public-payload smoke check.
 
 The publish job uses PyPI Trusted Publishing through GitHub OIDC. Configure the PyPI trusted publisher before publishing the first release.
 
@@ -129,7 +135,7 @@ Use these PyPI Trusted Publisher values:
 
 ## Release Checklist
 
-For `1.0.0rc1`, the expected release tag is `v1.0.0rc1`.
+For `1.0.0rc2`, the expected release tag is `v1.0.0rc2`.
 
 Stable releases still use `vMAJOR.MINOR.PATCH`; release candidates use `vMAJOR.MINOR.PATCHrcN`. In both cases, use the exact package version with a leading `v`.
 
@@ -137,7 +143,7 @@ Stable releases still use `vMAJOR.MINOR.PATCH`; release candidates use `vMAJOR.M
 2. Confirm `tbot223_base.__version__` matches the intended release version.
 3. Run the compatibility workflow manually if you want a pre-release signal before creating the GitHub Release.
 4. Create the version tag on the `main` commit.
-5. Run `scripts/check-release-readiness.sh --strict-release v1.0.0rc1` or `docker compose run --build --rm check --strict-release v1.0.0rc1`.
-6. Publish a GitHub Release from that tag.
+5. Run `scripts/check-release-readiness.sh --strict-release v1.0.0rc2` or `docker compose run --build --rm check --strict-release v1.0.0rc2`.
+6. Publish a GitHub prerelease from that release-candidate tag.
 
-The publish workflow will stop before PyPI upload if the tag, branch ancestry, package version, tests, build, or metadata check does not match the release contract.
+The publish workflow will stop before PyPI upload if the tag, release type, branch ancestry, package version, tests, typing, build, installed wheel, or metadata check does not match the release contract.

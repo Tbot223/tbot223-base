@@ -1,6 +1,6 @@
 [English](../../en/reference/exception-tracker.md)
 
-> 런타임 기준: package version 1.0.0rc1 (`tbot223_base.__version__ == "1.0.0rc1"`).
+> 런타임 기준: package version 1.0.0rc2 (`tbot223_base.__version__ == "1.0.0rc2"`).
 
 # ExceptionTracker 레퍼런스
 
@@ -17,6 +17,12 @@ Debug/public payload shape의 안정성 규칙은 [API 계약](../../contracts/k
 
 Public-safe 경로는 traceback text, local variables, params, system information을 수집하지 않는다.
 
+## Public tag safety
+
+Public tag key는 string으로 정규화하고, value는 caller-owned reference를 보존하지 않도록 JSON-safe structure로 복사한다.
+
+Public tag copy 정책은 exact built-in `None`, `bool`, `int`, finite `float`, bounded `str` 값을 유지한다. Plain `list`와 `tuple`은 복사된 list가 되고, plain `dict`는 정규화된 string key를 가진 dictionary가 된다. Collection마다 `CONTEXT_MAX_ITEMS`개까지 유지하며 nesting은 `PUBLIC_TAG_MAX_DEPTH`로 제한한다. 지원하지 않거나, 너무 크거나, non-finite이거나, 순환하거나, 너무 깊은 값은 `"<BLOCKED>"`로 대체한다.
+
 ## Import 경로
 
 `ExceptionTracker`, `ExceptionTrackerDecorator`는 `tbot223_base.exception_tracker`에서 import한다.
@@ -25,12 +31,13 @@ Public-safe 경로는 traceback text, local variables, params, system informatio
 
 Debug 경로는 `user_input`, `params.args`, `params.kwargs`, origin frame의 `local_variables`를 raw object reference가 아니라 안전한 복사본으로 저장한다.
 
-기본 context 제한값:
+기본 안전 제한값:
 
 | Constant | Value |
 | --- | --- |
 | `CONTEXT_MAX_VALUE_LENGTH` | `200` |
 | `CONTEXT_MAX_ITEMS` | `20` |
+| `PUBLIC_TAG_MAX_DEPTH` | `3` |
 
 작은 primitive와 primitive-only `list`/`tuple` 값만 복사한다. Top-level `dict` 값은 item 제한을 만족할 때만 복사한다. 깊은 nested 값, bytes-like 값, custom object는 metadata로 요약하지 않고 `"<BLOCKED>"`로 대체한다.
 
@@ -80,4 +87,6 @@ except Exception as error:
 
 ## Decorator
 
-`ExceptionTrackerDecorator`는 callable을 감싸고 uncaught exception을 failure `Result`로 변환한다. 성공 시에는 원래 반환 타입을 유지하고, 실패 시에는 `Result`를 반환한다.
+`ExceptionTrackerDecorator`는 synchronous function과 coroutine function을 감싸고 uncaught exception을 failure `Result`로 변환한다. Synchronous function은 원래 value 또는 failure `Result`를 반환하고, coroutine function과 awaitable result는 await했을 때 원래 value 또는 failure `Result`로 resolve된다.
+
+Generator와 async generator의 iteration은 decorated call이 반환된 뒤 실행되므로, 이후 iteration 중 발생한 exception은 이 decorator가 변환하지 않는다.

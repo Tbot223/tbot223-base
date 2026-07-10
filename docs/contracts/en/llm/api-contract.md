@@ -1,6 +1,6 @@
 [한국어 (Korean)](../../ko/llm/api-contract.md)
 
-> Contract revision: 2026-07-07.
+> Contract revision: 2026-07-10.
 
 # API Contract for LLM
 
@@ -22,8 +22,10 @@ Read [../human/api-contract.md](../human/api-contract.md) first.
 5. When public/debug payload shape changes, update tests before treating the change as complete.
 6. Keep public payloads free of debug-only fields.
 7. Keep debug payload safety behavior explicit: safe copies, `"<BLOCKED>"`, and masking after capture.
-8. If the supported Python version range changes, update `pyproject.toml`, CI workflow, and user docs together.
-9. Run the local verification commands that are available in the current checkout.
+8. Keep public tag values bounded, JSON-safe, and free of caller-owned object references.
+9. Keep synchronous and async decorator behavior covered by executable tests and consumer typing checks.
+10. If the supported Python version range changes, update `pyproject.toml`, CI workflow, and user docs together.
+11. Run the local verification commands that are available in the current checkout.
 
 ## Test Expectations
 
@@ -31,6 +33,7 @@ API-sensitive changes should run:
 
 ```bash
 pytest -q
+python -m mypy
 python -m py_compile tbot223_base/__init__.py tbot223_base/result.py tbot223_base/exception_tracker.py
 git diff --check
 ```
@@ -40,6 +43,7 @@ When CI is available, the optional Python compatibility workflow should be used 
 ## Do Not
 
 - Do not expose traceback, params, user input, local variables, or system information in public payloads.
+- Do not retain unsupported caller-owned objects inside public tags.
 - Do not introduce alternate public import paths without documenting them in the API contract.
 - Do not change `ResultStatus` string values without documenting a breaking change.
 - Do not update docs without matching behavior tests when payload behavior changes.

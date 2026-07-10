@@ -1,6 +1,6 @@
 [한국어 (Korean)](../../ko/guides/getting-started.md)
 
-> Runtime baseline: package version 1.0.0rc1 (`tbot223_base.__version__ == "1.0.0rc1"`).
+> Runtime baseline: package version 1.0.0rc2 (`tbot223_base.__version__ == "1.0.0rc2"`).
 
 # Getting Started
 
@@ -67,6 +67,8 @@ except Exception as error:
 ```
 
 Use the public path for API responses, UI surfaces, or any boundary where raw exception details should not be exposed.
+
+Public tag keys are normalized to bounded strings. Values are copied into a bounded JSON-safe shape; unsupported, oversized, cyclic, or deeply nested values become `"<BLOCKED>"` instead of retaining caller-owned object references.
 
 ## Debug Exception Payload
 

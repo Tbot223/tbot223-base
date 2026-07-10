@@ -1,4 +1,6 @@
 # external modules
+import inspect
+import math
 import os
 import platform
 import sys
@@ -10,7 +12,7 @@ from collections.abc import Iterable, Mapping
 from copy import deepcopy
 from functools import wraps
 from types import MappingProxyType
-from typing import Callable, Dict, List, Literal, Optional, ParamSpec, Tuple, TypeAlias, TypeGuard, TypeVar, TypedDict, Union, cast
+from typing import Any, Awaitable, Callable, Dict, List, Literal, Optional, ParamSpec, Tuple, TypeAlias, TypeGuard, TypeVar, TypedDict, Union, cast, overload
 
 # internal modules
 from tbot223_base.result import Result, ResultStatus
@@ -22,6 +24,15 @@ MaskPathsInput: TypeAlias = Optional[Union[MaskPath, Iterable[MaskPath]]]
 ExceptionParams: TypeAlias = Tuple[Tuple[object, ...], Mapping[str, object]]
 PublicTags: TypeAlias = Mapping[object, object]
 PublicErrorCode: TypeAlias = Union[str, int]
+PublicTagValue: TypeAlias = Union[
+    None,
+    bool,
+    int,
+    float,
+    str,
+    List["PublicTagValue"],
+    Dict[str, "PublicTagValue"],
+]
 ContextSequence: TypeAlias = Union[List[object], Tuple[object, ...]]
 ContextMapping: TypeAlias = Dict[object, object]
 
@@ -37,7 +48,7 @@ class PublicErrorInfo(TypedDict):
     success: Optional[bool]
     timestamp: Optional[str]
     error: PublicErrorDetail
-    tags: Dict[str, object]
+    tags: Dict[str, PublicTagValue]
     retryable: Optional[bool]
 
 
@@ -284,6 +295,7 @@ class ExceptionTracker:
     DEFAULT_MASK_PRESETS: Tuple[MaskPreset, ...] = ("default",)
     CONTEXT_MAX_VALUE_LENGTH = 200
     CONTEXT_MAX_ITEMS = 20
+    PUBLIC_TAG_MAX_DEPTH = 3
     MASK_PRESETS: Mapping[MaskPreset, Tuple[Tuple[str, ...], ...]] = MappingProxyType(
         {
             "default": (
@@ -337,12 +349,12 @@ class ExceptionTracker:
     @staticmethod
     def _normalize_public_context(public_context: object) -> Optional[str]:
         """Normalize public context into a safe optional string."""
-        if isinstance(public_context, str) and public_context:
+        if type(public_context) is str and public_context:
             return public_context
         return None
 
     @staticmethod
-    def _safe_exception_text(error: Exception) -> str:
+    def _safe_exception_text(error: BaseException) -> str:
         """Return exception text without allowing `__str__` failures to escape."""
         try:
             return str(error)
@@ -363,6 +375,92 @@ class ExceptionTracker:
     def _copy_system_info_snapshot(system_info: Mapping[str, object]) -> Dict[str, object]:
         """Return an isolated system information snapshot copy."""
         return cast(Dict[str, object], deepcopy(dict(system_info)))
+
+    @classmethod
+    def _normalize_public_tag_key(cls, key: object) -> Optional[str]:
+        """Return a bounded JSON object key for a public tag."""
+        if type(key) is str:
+            return key if len(key) <= cls.CONTEXT_MAX_VALUE_LENGTH else None
+        if type(key) in (bool, int) or key is None:
+            return str(key)
+        if type(key) is float and math.isfinite(cast(float, key)):
+            return str(key)
+        return None
+
+    @classmethod
+    def _copy_public_tag_value(
+        cls,
+        value: object,
+        *,
+        depth: int = 0,
+        seen: Optional[set[int]] = None,
+    ) -> PublicTagValue:
+        """Return a bounded JSON-safe copy of a public tag value."""
+        if value is None or type(value) in (bool, int):
+            return cast(PublicTagValue, value)
+        if type(value) is float:
+            return value if math.isfinite(cast(float, value)) else cls.BLOCKED_VALUE
+        if type(value) is str:
+            return value if len(cast(str, value)) <= cls.CONTEXT_MAX_VALUE_LENGTH else cls.BLOCKED_VALUE
+
+        if depth >= cls.PUBLIC_TAG_MAX_DEPTH:
+            return cls.BLOCKED_VALUE
+
+        active_ids = set() if seen is None else seen
+        value_id = id(value)
+        if value_id in active_ids:
+            return cls.BLOCKED_VALUE
+
+        if type(value) in (list, tuple):
+            sequence = cast(Union[List[object], Tuple[object, ...]], value)
+            if len(sequence) > cls.CONTEXT_MAX_ITEMS:
+                return cls.BLOCKED_VALUE
+            active_ids.add(value_id)
+            try:
+                return [
+                    cls._copy_public_tag_value(item, depth=depth + 1, seen=active_ids)
+                    for item in sequence
+                ]
+            finally:
+                active_ids.remove(value_id)
+
+        if type(value) is dict:
+            mapping = cast(Dict[object, object], value)
+            if len(mapping) > cls.CONTEXT_MAX_ITEMS:
+                return cls.BLOCKED_VALUE
+            active_ids.add(value_id)
+            try:
+                copied_mapping: Dict[str, PublicTagValue] = {}
+                for key, item in mapping.items():
+                    normalized_key = cls._normalize_public_tag_key(key)
+                    if normalized_key is None:
+                        continue
+                    copied_mapping[normalized_key] = cls._copy_public_tag_value(
+                        item,
+                        depth=depth + 1,
+                        seen=active_ids,
+                    )
+                return copied_mapping
+            finally:
+                active_ids.remove(value_id)
+
+        return cls.BLOCKED_VALUE
+
+    @classmethod
+    def _copy_public_tags(cls, tags: object) -> Dict[str, PublicTagValue]:
+        """Return bounded JSON-safe public tags with normalized string keys."""
+        if not isinstance(tags, Mapping):
+            return {}
+
+        copied_tags: Dict[str, PublicTagValue] = {}
+        for index, (key, value) in enumerate(tags.items()):
+            if index >= cls.CONTEXT_MAX_ITEMS:
+                break
+            normalized_key = cls._normalize_public_tag_key(key)
+            if normalized_key is None:
+                continue
+            copied_tags[normalized_key] = cls._copy_public_tag_value(value)
+        return copied_tags
 
     @classmethod
     def _apply_failure_metadata(cls, error_info: dict) -> None:
@@ -401,20 +499,17 @@ class ExceptionTracker:
         cls._apply_failure_metadata(raw_public_error_info)
         public_error_info = cast(PublicErrorInfo, raw_public_error_info)
         public_error_info["error"]["code"] = (
-            cls.DEFAULT_PUBLIC_ERROR_CODE
-            if error_code is None else error_code
+            error_code
+            if type(error_code) is str or type(error_code) is int
+            else cls.DEFAULT_PUBLIC_ERROR_CODE
         )
         public_error_info["error"]["message"] = (
             public_message
-            if isinstance(public_message, str) and public_message
+            if type(public_message) is str and public_message
             else cls.DEFAULT_PUBLIC_MESSAGE
         )
-        public_error_info["tags"] = (
-            {str(key): value for key, value in tags.items()}
-            if isinstance(tags, Mapping)
-            else {}
-        )
-        public_error_info["retryable"] = retryable if isinstance(retryable, bool) else None
+        public_error_info["tags"] = cls._copy_public_tags(tags)
+        public_error_info["retryable"] = retryable if type(retryable) is bool else None
         return public_error_info
 
     @classmethod
@@ -987,7 +1082,7 @@ class ExceptionTracker:
         | **(O)** | `error_code` | `Optional[PublicErrorCode]` | Public-facing error code. Default: `"UNEXPECTED_ERROR"`. |
         | **(O)** | `public_message` | `Optional[str]` | Public-facing error message. Default: generic safe message. |
         | **(O)** | `public_context` | `Optional[str]` | Public-facing context string for the returned `Result`. Default: `None`. |
-        | **(O)** | `tags` | `Optional[PublicTags]` | Public metadata tags to attach to the payload. Default: `None`. |
+        | **(O)** | `tags` | `Optional[PublicTags]` | Public metadata copied into a bounded JSON-safe shape. Default: `None`. |
         | **(O)** | `retryable` | `Optional[bool]` | Whether the caller may retry the operation. Default: `None`. |
 
         ### Returns
@@ -997,6 +1092,7 @@ class ExceptionTracker:
         > - This path avoids collecting traceback text, local variables, params, and system information.
         > - The payload is designed for API responses, UI surfaces, or other untrusted boundaries.
         > - `error` is accepted for API symmetry, but its raw message is not exposed unless you pass a safe `public_message`.
+        > - Tag keys are normalized to strings, and unsupported, oversized, non-finite, cyclic, or too-deep values become `"<BLOCKED>"`.
 
         ### Example
         >>> from tbot223_base.exception_tracker import ExceptionTracker
@@ -1117,7 +1213,7 @@ class ExceptionTracker:
         | **(O)** | `error_code` | `Optional[PublicErrorCode]` | Public-facing error code. Default: `"UNEXPECTED_ERROR"`. |
         | **(O)** | `public_message` | `Optional[str]` | Public-facing error message. Default: generic safe message. |
         | **(O)** | `public_context` | `Optional[str]` | Public-facing context string for the returned `Result`. Default: `None`. |
-        | **(O)** | `tags` | `Optional[PublicTags]` | Public metadata tags to attach to the payload. Default: `None`. |
+        | **(O)** | `tags` | `Optional[PublicTags]` | Public metadata copied into a bounded JSON-safe shape. Default: `None`. |
         | **(O)** | `retryable` | `Optional[bool]` | Whether the caller may retry the operation. Default: `None`. |
 
         ### Returns
@@ -1126,6 +1222,7 @@ class ExceptionTracker:
         ### Note
         > - This method is a public-safe counterpart to `get_exception_return()`.
         > - It does not collect traceback text, local variables, params, or system information.
+        > - Tag keys are normalized to strings, and unsupported, oversized, non-finite, cyclic, or too-deep values become `"<BLOCKED>"`.
 
         ### Example
         >>> from tbot223_base.exception_tracker import ExceptionTracker
@@ -1215,10 +1312,12 @@ class ExceptionTrackerDecorator:
     > | `'system_info'` | Masks `system_info`. |
 
     ### Returns
-    `Callable[P, Union[R, Result[object]]]` — Wrapped function returning the original result or a failure `Result` on error.
+    `Callable` — Returns a wrapped synchronous or async function that produces the original value or a failure `Result`.
 
     ### Note
     > - Converts uncaught exceptions into standardized `Result` objects.
+    > - Coroutine functions and awaitable results are awaited inside the wrapper so async exceptions are converted too.
+    > - Generator and async-generator iteration exceptions occur after the wrapper returns and are not converted.
     > - Best suited for non-critical convenience wrappers.
     > - Not ideal when the caller depends on side effects.
     > - `mask_presets` supports `default`, `private`, `user_input`, `params`, `traceback`, and `system_info`.
@@ -1248,11 +1347,39 @@ class ExceptionTrackerDecorator:
         self.mask_presets = ExceptionTracker._normalize_mask_presets(mask_presets)
         self.mask_paths = ExceptionTracker._normalize_mask_paths(mask_paths)
 
+    @overload
+    def __call__(
+        self,
+        func: Callable[P, Awaitable[R]],
+    ) -> Callable[P, Awaitable[Union[R, Result[object]]]]:
+        ...
+
+    @overload
     def __call__(self, func: Callable[P, R]) -> Callable[P, Union[R, Result[object]]]:
+        ...
+
+    def __call__(self, func: Callable[P, Any]) -> Callable[P, Any]:
+        if inspect.iscoroutinefunction(func):
+            async_func = cast(Callable[P, Awaitable[Any]], func)
+
+            @wraps(func)
+            async def async_wrapper(*args: P.args, **kwargs: P.kwargs) -> Any:
+                try:
+                    return await async_func(*args, **kwargs)
+                except Exception as e:
+                    return self.tracker.get_exception_return(
+                        error=e,
+                        params=(cast(Tuple[object, ...], args), cast(Mapping[str, object], kwargs)),
+                        mask_presets=self.mask_presets,
+                        mask_paths=self.mask_paths,
+                    )
+
+            return async_wrapper
+
         @wraps(func)
-        def wrapper(*args: P.args, **kwargs: P.kwargs) -> Union[R, Result[object]]:
+        def wrapper(*args: P.args, **kwargs: P.kwargs) -> Any:
             try:
-                return func(*args, **kwargs)
+                result = func(*args, **kwargs)
             except Exception as e:
                 # Use the tracker to get standardized exception return
                 return self.tracker.get_exception_return(
@@ -1261,4 +1388,20 @@ class ExceptionTrackerDecorator:
                     mask_presets=self.mask_presets,
                     mask_paths=self.mask_paths,
                 )
+            if inspect.isawaitable(result):
+                awaitable_result = cast(Awaitable[Any], result)
+
+                async def await_result() -> Any:
+                    try:
+                        return await awaitable_result
+                    except Exception as e:
+                        return self.tracker.get_exception_return(
+                            error=e,
+                            params=(cast(Tuple[object, ...], args), cast(Mapping[str, object], kwargs)),
+                            mask_presets=self.mask_presets,
+                            mask_paths=self.mask_paths,
+                        )
+
+                return await_result()
+            return result
         return wrapper

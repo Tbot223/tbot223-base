@@ -1,6 +1,6 @@
 [한국어 (Korean)](../../ko/reference/exception-tracker.md)
 
-> Runtime baseline: package version 1.0.0rc1 (`tbot223_base.__version__ == "1.0.0rc1"`).
+> Runtime baseline: package version 1.0.0rc2 (`tbot223_base.__version__ == "1.0.0rc2"`).
 
 # ExceptionTracker Reference
 
@@ -17,6 +17,12 @@ For stability rules around debug/public payload shapes, see the [API contract](.
 
 The public-safe path does not collect traceback text, local variables, params, or system information.
 
+## Public Tag Safety
+
+Public tag keys are normalized to strings, and tag values are copied into a JSON-safe structure instead of retaining caller-owned references.
+
+The public tag copy policy keeps exact built-in `None`, `bool`, `int`, finite `float`, and bounded `str` values. Plain `list` and `tuple` values become copied lists, and plain `dict` values become dictionaries with normalized string keys. Each collection keeps at most `CONTEXT_MAX_ITEMS` items and nesting is limited by `PUBLIC_TAG_MAX_DEPTH`. Unsupported, oversized, non-finite, cyclic, or too-deep values become `"<BLOCKED>"`.
+
 ## Import Path
 
 Import `ExceptionTracker` and `ExceptionTrackerDecorator` from `tbot223_base.exception_tracker`.
@@ -25,12 +31,13 @@ Import `ExceptionTracker` and `ExceptionTrackerDecorator` from `tbot223_base.exc
 
 The debug path stores `user_input`, `params.args`, `params.kwargs`, and origin-frame `local_variables` as safe copies rather than raw object references.
 
-Default context limits:
+Default safety limits:
 
 | Constant | Value |
 | --- | --- |
 | `CONTEXT_MAX_VALUE_LENGTH` | `200` |
 | `CONTEXT_MAX_ITEMS` | `20` |
+| `PUBLIC_TAG_MAX_DEPTH` | `3` |
 
 Small primitives and primitive-only `list`/`tuple` values are copied. Top-level `dict` values are copied only when they fit the item limit. Deep, bytes-like, or custom object values are replaced with `"<BLOCKED>"` instead of metadata summaries.
 
@@ -80,4 +87,6 @@ except Exception as error:
 
 ## Decorator
 
-`ExceptionTrackerDecorator` wraps a callable and converts uncaught exceptions into failure `Result` objects. It preserves the original return type on success and returns `Result` on failure.
+`ExceptionTrackerDecorator` wraps synchronous and coroutine functions and converts uncaught exceptions into failure `Result` objects. A synchronous function returns its original value or a failure `Result`; coroutine functions and awaitable results resolve to their original value or a failure `Result` when awaited.
+
+Generator and async-generator iteration happens after the decorated call returns, so exceptions raised during later iteration are not converted by this decorator.

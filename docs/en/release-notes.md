@@ -2,6 +2,25 @@
 
 # Release Notes
 
+## 1.0.0rc2 — 2026-07-10
+
+`1.0.0rc2` closes the remaining async, typing, and public-payload safety gaps found during the 1.0 release review. No public API removals are included.
+
+### Added
+
+- `ExceptionTrackerDecorator` now awaits coroutine functions and awaitable results inside the wrapper and converts their uncaught exceptions into failure `Result` objects while preserving successful async return values.
+- Added an optional `type` dependency group, package-level mypy configuration, and a mypy gate in the Python 3.10-3.14 compatibility workflow and local release-readiness script.
+- Release checks now install the built wheel in an isolated environment and verify imports, `Result`, public payload JSON serialization, and the packaged `py.typed` marker.
+- Source distributions now include the bilingual docs, runnable examples, release script, full tests, and public consumer type-check fixture referenced by the repository metadata.
+
+### Changed
+
+- Public tag keys and values are now copied into a bounded JSON-safe shape. Unsupported, oversized, non-finite, cyclic, or too-deep values become `"<BLOCKED>"` without retaining caller-owned object references.
+- `Result._make()` and `Result._replace()` keep runtime status normalization and subclass reconstruction while matching the generated `NamedTuple` typing surface.
+- Strict local release mode now requires the release tag to point at `HEAD` and the working tree to be clean.
+- The publish workflow now requires release-candidate tags to use the GitHub prerelease flag and stable tags not to use it.
+- Installation docs now use an exact `1.0.0rc2` prerelease command while keeping the unqualified command for stable releases, and the Apache license notice now contains the final copyright text.
+
 ## 1.0.0rc1 — 2026-07-10
 
 `1.0.0rc1` is the 1.0 API-stabilization release candidate. No public API removals are included in this release candidate.
@@ -13,6 +32,7 @@
 - Explicit `location.origin` masks now also affect the derived debug `Result.context` string, including partial origin masks that feed the formatted context.
 - Unprintable exception text now falls back to `<unprintable ...>` while staying inside the failure `Result` / decorator boundary.
 - Each debug payload now gets isolated per-call snapshots for `system_info.now` and copied `system_info.started_at`, and the docs/examples now document safe reuse of one tracker instance across threads.
+- `ExceptionTracker.MASK_PRESETS` is now read-only so shared preset definitions cannot be mutated at runtime.
 - Documentation now clarifies the public-safe payload path, when debug masking is still required for trusted-only payloads, and which security boundaries the caller still owns.
 - Added executable `Result` and `ExceptionTracker` examples plus aligned English/Korean examples guides.
 - Host-side release tooling now supports Python 3.10 through the `tomli` fallback when `tomllib` is unavailable.

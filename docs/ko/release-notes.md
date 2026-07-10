@@ -2,6 +2,25 @@
 
 # 릴리스 노트
 
+## 1.0.0rc2 — 2026-07-10
+
+`1.0.0rc2`는 1.0 release review에서 발견한 async, typing, public payload safety gap을 마무리한다. Public API 제거는 없다.
+
+### Added
+
+- `ExceptionTrackerDecorator`가 이제 wrapper 안에서 coroutine function과 awaitable result를 await하고, 성공한 async return value는 유지하면서 uncaught exception을 failure `Result`로 변환한다.
+- Optional `type` dependency group, package-level mypy configuration, Python 3.10-3.14 compatibility workflow와 local release-readiness script의 mypy gate를 추가했다.
+- Release check가 built wheel을 격리 환경에 설치한 뒤 import, `Result`, public payload JSON serialization, packaged `py.typed` marker를 검증한다.
+- Source distribution에 bilingual docs, runnable example, release script, 전체 test, repository metadata가 참조하는 public consumer type-check fixture를 포함한다.
+
+### Changed
+
+- Public tag key와 value를 bounded JSON-safe shape로 복사한다. 지원하지 않거나, 너무 크거나, non-finite이거나, 순환하거나, 너무 깊은 값은 caller-owned object reference를 보존하지 않고 `"<BLOCKED>"`로 바뀐다.
+- `Result._make()`와 `Result._replace()`가 runtime status normalization과 subclass reconstruction을 유지하면서 generated `NamedTuple` typing surface와 일치하도록 정리했다.
+- Strict local release mode는 release tag가 `HEAD`를 가리키고 working tree가 clean한 상태를 요구한다.
+- Publish workflow는 release-candidate tag에 GitHub prerelease flag를 요구하고 stable tag에는 그 flag를 허용하지 않는다.
+- 설치 문서는 exact `1.0.0rc2` prerelease 명령을 사용하고 unqualified command는 stable release용으로 유지하며, Apache license notice도 최종 copyright text로 정리했다.
+
 ## 1.0.0rc1 — 2026-07-10
 
 `1.0.0rc1`은 1.0 API 안정화를 위한 release candidate다. 이번 release candidate에는 public API 제거가 없다.
@@ -13,6 +32,7 @@
 - 명시적인 `location.origin` mask는 이제 formatting에 사용되는 파생 debug `Result.context` 문자열에도 반영되며, 부분 origin mask도 같은 규칙을 따른다.
 - 출력할 수 없는 exception text는 이제 failure `Result` / decorator boundary 밖으로 새지 않고 `<unprintable ...>` fallback으로 처리된다.
 - 각 debug payload는 이제 `system_info.now`와 복사된 `system_info.started_at`에 대해 호출별로 분리된 snapshot을 가지며, 문서와 예시는 하나의 tracker instance를 여러 thread에서 안전하게 재사용하는 방법을 설명한다.
+- `ExceptionTracker.MASK_PRESETS`를 read-only로 바꿔 shared preset definition이 runtime에 변경되지 않도록 했다.
 - 문서는 public-safe payload 경로를 언제 써야 하는지, trusted-only debug payload에도 여전히 어떤 masking이 필요한지, 그리고 어떤 보안 경계를 caller가 직접 책임져야 하는지를 더 명확히 설명한다.
 - 실행 가능한 `Result` / `ExceptionTracker` 예시와 이에 맞춘 영문/국문 examples guide를 추가했다.
 - Host-side release tooling은 `tomllib`가 없는 경우 `tomli` fallback을 사용해 Python 3.10도 지원한다.

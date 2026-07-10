@@ -1,5 +1,7 @@
+import asyncio
 from concurrent.futures import ThreadPoolExecutor
 import gc
+import json
 import sys
 import weakref
 from typing import Dict, cast
@@ -815,6 +817,69 @@ def test_public_exception_info_returns_lightweight_safe_payload():
     assert "system_info" not in public_info
 
 
+def test_public_exception_info_copies_bounded_json_safe_tags():
+    tracker = ExceptionTracker()
+    secret = _LargeContext()
+    cyclic_list = []
+    cyclic_list.append(cyclic_list)
+    custom_key = object()
+
+    result = tracker.get_public_exception_info(
+        RuntimeError("internal"),
+        tags={
+            "nested": {
+                "items": ("ok", 1, {"secret": secret}),
+            },
+            "cyclic": cyclic_list,
+            "custom_text": _CustomText("blocked"),
+            "not_finite": float("nan"),
+            "too_long": "x" * (ExceptionTracker.CONTEXT_MAX_VALUE_LENGTH + 1),
+            "too_many": list(range(ExceptionTracker.CONTEXT_MAX_ITEMS + 1)),
+            1: "numeric-key",
+            custom_key: "ignored-key",
+        },
+    )
+
+    tags = result.data["tags"]
+
+    assert tags["nested"] == {
+        "items": ["ok", 1, {"secret": ExceptionTracker.BLOCKED_VALUE}],
+    }
+    assert tags["cyclic"] == [ExceptionTracker.BLOCKED_VALUE]
+    assert tags["custom_text"] == ExceptionTracker.BLOCKED_VALUE
+    assert tags["not_finite"] == ExceptionTracker.BLOCKED_VALUE
+    assert tags["too_long"] == ExceptionTracker.BLOCKED_VALUE
+    assert tags["too_many"] == ExceptionTracker.BLOCKED_VALUE
+    assert tags["1"] == "numeric-key"
+    assert str(custom_key) not in tags
+    assert not _contains_identity(tags, secret)
+    json.dumps(result.data, allow_nan=False)
+
+    bounded_result = tracker.get_public_exception_info(
+        RuntimeError("internal"),
+        tags={f"key_{index}": index for index in range(ExceptionTracker.CONTEXT_MAX_ITEMS + 5)},
+    )
+
+    assert len(bounded_result.data["tags"]) == ExceptionTracker.CONTEXT_MAX_ITEMS
+
+
+def test_public_exception_info_rejects_scalar_subclasses_in_public_fields():
+    tracker = ExceptionTracker()
+
+    result = tracker.get_public_exception_info(
+        RuntimeError("internal"),
+        error_code=_CustomInteger(404),
+        public_message=_CustomText("custom message"),
+        public_context=_CustomText("Custom.Context"),
+        retryable=1,
+    )
+
+    assert result.error == ExceptionTracker.DEFAULT_PUBLIC_MESSAGE
+    assert result.context is None
+    assert result.data["error"]["code"] == ExceptionTracker.DEFAULT_PUBLIC_ERROR_CODE
+    assert result.data["retryable"] is None
+
+
 def test_public_exception_return_uses_safe_defaults():
     tracker = ExceptionTracker()
 
@@ -858,6 +923,38 @@ def test_exception_tracker_decorator_converts_exception_to_result():
     assert isinstance(result, Result)
     assert result.status is ResultStatus.FAILURE
     assert result.data["input_context"]["params"] == ExceptionTracker.MASKED_VALUE
+
+
+def test_exception_tracker_decorator_supports_async_success_and_failure():
+    tracker = ExceptionTracker()
+
+    @ExceptionTrackerDecorator(mask_presets=("private",), tracker=tracker)
+    async def add(x, y):
+        return x + y
+
+    @ExceptionTrackerDecorator(mask_presets=("private",), tracker=tracker)
+    async def risky_divide(x, y):
+        return x / y
+
+    async def deferred_divide(x, y):
+        return x / y
+
+    @ExceptionTrackerDecorator(mask_presets=("private",), tracker=tracker)
+    def return_awaitable(x, y):
+        return deferred_divide(x, y)
+
+    assert asyncio.run(add(2, 3)) == 5
+
+    result = asyncio.run(risky_divide(10, 0))
+
+    assert isinstance(result, Result)
+    assert result.status is ResultStatus.FAILURE
+    assert result.data["input_context"]["params"] == ExceptionTracker.MASKED_VALUE
+
+    deferred_result = asyncio.run(return_awaitable(10, 0))
+
+    assert isinstance(deferred_result, Result)
+    assert deferred_result.status is ResultStatus.FAILURE
 
 
 def test_get_exception_info_handles_unprintable_exception_text():

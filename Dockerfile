@@ -22,10 +22,10 @@ COPY tbot223_base ./tbot223_base
 COPY tests ./tests
 
 RUN python -m pip install --upgrade pip \
-    && python -m pip install -e ".[test,release]" \
+    && python -m pip install -e ".[test,type,release]" \
     && git config --global --add safe.directory /workspace
 
 COPY . .
 
 ENTRYPOINT ["bash", "scripts/check-release-readiness.sh"]
-CMD ["v1.0.0rc1"]
+CMD ["v1.0.0rc2"]

@@ -28,10 +28,13 @@ jobs:
           python-version: ${{ matrix.python-version }}
           cache: pip
 
-      - name: Install package with test dependencies
+      - name: Install package with test and type dependencies
         run: |
           python -m pip install --upgrade pip
-          python -m pip install -e ".[test]"
+          python -m pip install -e ".[test,type]"
 
       - name: Run tests
         run: pytest -q
+
+      - name: Check package typing
+        run: python -m mypy

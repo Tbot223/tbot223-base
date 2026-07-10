@@ -1,6 +1,6 @@
 [English](../en/README.md)
 
-> 런타임 기준: package version 1.0.0rc1 (`tbot223_base.__version__ == "1.0.0rc1"`).
+> 런타임 기준: package version 1.0.0rc2 (`tbot223_base.__version__ == "1.0.0rc2"`).
 
 # tbot223-base 문서
 

@@ -1,13 +1,14 @@
 # external modules
 from collections.abc import Iterable
 from enum import Enum
-from typing import TYPE_CHECKING, Generic, NamedTuple, Optional, TypeVar, Union, cast
+from typing import Any, TYPE_CHECKING, Generic, NamedTuple, Optional, TypeVar, Union, cast
 
 # internal modules
 
 _RESULT_SENTINEL = object()
 _DataT = TypeVar("_DataT")
 _DefaultT = TypeVar("_DefaultT")
+_ResultT = TypeVar("_ResultT", bound="Result[Any]")
 
 
 class ResultStatus(str, Enum):
@@ -147,13 +148,26 @@ class Result(_ResultBase[_DataT], Generic[_DataT]):
         normalized_status = ResultStatus.normalize(status)
         return cast("Result[_DataT]", tuple.__new__(cls, (normalized_status, error, context, data)))
 
-    @classmethod
-    def _make(cls: type["Result[_DataT]"], iterable: Iterable[object]) -> "Result[_DataT]":
-        result = super()._make(iterable)
-        return cls(result.status, result.error, result.context, cast(_DataT, result.data))
+    if not TYPE_CHECKING:
+        @classmethod
+        def _make(cls: type[_ResultT], iterable: Iterable[object]) -> _ResultT:
+            values = tuple(iterable)
+            if len(values) != len(cls._fields):
+                raise TypeError(f"Expected {len(cls._fields)} arguments, got {len(values)}")
+            return cls(*values)
 
-    def _replace(self, /, **kwds: object) -> "Result[_DataT]":
-        return cast("Result[_DataT]", super()._replace(**kwds))
+    def _replace(self: _ResultT, /, **kwds: object) -> _ResultT:
+        unexpected_fields = set(kwds).difference(self._fields)
+        if unexpected_fields:
+            field_names = ", ".join(sorted(unexpected_fields))
+            raise TypeError(f"Got unexpected field names: {field_names}")
+
+        return type(self)(
+            kwds.get("status", self.status),
+            cast(Optional[str], kwds.get("error", self.error)),
+            cast(Optional[str], kwds.get("context", self.context)),
+            kwds.get("data", self.data),
+        )
 
     @property
     def success(self) -> Optional[bool]:

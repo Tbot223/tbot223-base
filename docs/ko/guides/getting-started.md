@@ -1,6 +1,6 @@
 [English](../../en/guides/getting-started.md)
 
-> 런타임 기준: package version 1.0.0rc1 (`tbot223_base.__version__ == "1.0.0rc1"`).
+> 런타임 기준: package version 1.0.0rc2 (`tbot223_base.__version__ == "1.0.0rc2"`).
 
 # Getting Started
 
@@ -67,6 +67,8 @@ except Exception as error:
 ```
 
 API 응답, UI, 외부 경계처럼 raw exception detail을 노출하면 안 되는 곳에서는 public 경로를 사용한다.
+
+Public tag key는 bounded string으로 정규화한다. Value는 bounded JSON-safe shape로 복사하며, 지원하지 않거나 너무 크거나 순환하거나 너무 깊게 중첩된 값은 caller-owned object reference를 보존하지 않고 `"<BLOCKED>"`로 대체한다.
 
 ## Debug 예외 payload
 
