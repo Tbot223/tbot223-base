@@ -32,7 +32,7 @@ jobs:
           fi
 
           if [[ ! "${TAG_NAME}" =~ ${TAG_PATTERN} ]]; then
-            echo "Release tag must use stable vMAJOR.MINOR.PATCH or release-candidate vMAJOR.MINOR.PATCHrcN format, for example v1.0.0rc2."
+            echo "Release tag must use stable vMAJOR.MINOR.PATCH or release-candidate vMAJOR.MINOR.PATCHrcN format, for example v1.0.0."
             exit 1
           fi
 

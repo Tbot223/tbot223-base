@@ -12,8 +12,8 @@ and release tag/version consistency.
 
 Examples:
   scripts/check-release-readiness.sh
-  scripts/check-release-readiness.sh v1.0.0rc2
-  scripts/check-release-readiness.sh --strict-release v1.0.0rc2
+  scripts/check-release-readiness.sh v1.0.0
+  scripts/check-release-readiness.sh --strict-release v1.0.0
 USAGE
 }
 
@@ -75,7 +75,7 @@ if [[ -z "${RELEASE_TAG}" ]]; then
 fi
 
 if [[ ! "${RELEASE_TAG}" =~ ${RELEASE_TAG_REGEX} ]]; then
-  echo "Release tag must use stable vMAJOR.MINOR.PATCH or release-candidate vMAJOR.MINOR.PATCHrcN format, for example v1.0.0rc2." >&2
+  echo "Release tag must use stable vMAJOR.MINOR.PATCH or release-candidate vMAJOR.MINOR.PATCHrcN format, for example v1.0.0." >&2
   exit 1
 fi
 

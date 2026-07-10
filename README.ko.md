@@ -1,6 +1,6 @@
 [English](README.md)
 
-> 런타임 기준: package version 1.0.0rc2 (`tbot223_base.__version__ == "1.0.0rc2"`).
+> 런타임 기준: package version 1.0.0 (`tbot223_base.__version__ == "1.0.0"`).
 
 # tbot223-base
 
@@ -47,10 +47,10 @@ Rust의 `Result`는 독자가 비교할 수 있는 기준일 수 있지만, 이 
 ## 설치
 
 ```bash
-python -m pip install --pre "tbot223-base==1.0.0rc2"
+python -m pip install "tbot223-base==1.0.0"
 ```
 
-최신 stable release를 설치하려면 대신 `python -m pip install tbot223-base`를 사용한다.
+Version을 고정하지 않고 최신 stable release를 설치하려면 `python -m pip install tbot223-base`를 사용한다.
 
 Source checkout에서 local development를 할 때는 다음처럼 설치한다.
 

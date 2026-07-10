@@ -1,6 +1,6 @@
 [한국어 (Korean)](../../ko/guides/package-and-ci.md)
 
-> Runtime baseline: package version 1.0.0rc2 (`tbot223_base.__version__ == "1.0.0rc2"`).
+> Runtime baseline: package version 1.0.0 (`tbot223_base.__version__ == "1.0.0"`).
 
 # Package and CI Guide
 
@@ -52,13 +52,13 @@ python -m pip install -e ".[test,type,release]"
 Then run the release readiness check.
 
 ```bash
-scripts/check-release-readiness.sh v1.0.0rc2
+scripts/check-release-readiness.sh v1.0.0
 ```
 
-Use strict release mode after the `v1.0.0rc2` tag exists locally, points at `HEAD`, the working tree is clean, and `origin/main` is available.
+Use strict release mode after the `v1.0.0` tag exists locally, points at `HEAD`, the working tree is clean, and `origin/main` is available.
 
 ```bash
-scripts/check-release-readiness.sh --strict-release v1.0.0rc2
+scripts/check-release-readiness.sh --strict-release v1.0.0
 ```
 
 Release gates accept stable `vMAJOR.MINOR.PATCH` tags and release-candidate `vMAJOR.MINOR.PATCHrcN` tags. After removing the leading `v`, the tag text must still exactly match `tbot223_base.__version__`.
@@ -79,7 +79,7 @@ docker compose run --build --rm test
 docker compose run --build --rm check
 ```
 
-The `test` service runs only `pytest -q`. The `check` service runs `scripts/check-release-readiness.sh v1.0.0rc2` inside an image that installs the `test`, `type`, and `release` dependency groups and includes `actionlint`.
+The `test` service runs only `pytest -q`. The `check` service runs `scripts/check-release-readiness.sh v1.0.0` inside an image that installs the `test`, `type`, and `release` dependency groups and includes `actionlint`.
 
 ## Compatibility CI
 
@@ -115,7 +115,7 @@ The workflow at `.github/workflows/publish.yml` runs only when a GitHub Release 
 Before uploading anything, it validates:
 
 - the release has a tag.
-- the tag uses stable `vMAJOR.MINOR.PATCH` or release-candidate `vMAJOR.MINOR.PATCHrcN` format, for example `v1.0.0rc2`.
+- the tag uses stable `vMAJOR.MINOR.PATCH` or release-candidate `vMAJOR.MINOR.PATCHrcN` format, for example `v1.0.0`.
 - release-candidate tags are published as GitHub prereleases, while stable tags are not.
 - the tag points to a commit contained in `origin/main`.
 - the tag version matches `tbot223_base.__version__` after removing the leading `v`.
@@ -135,7 +135,7 @@ Use these PyPI Trusted Publisher values:
 
 ## Release Checklist
 
-For `1.0.0rc2`, the expected release tag is `v1.0.0rc2`.
+For `1.0.0`, the expected release tag is `v1.0.0`.
 
 Stable releases still use `vMAJOR.MINOR.PATCH`; release candidates use `vMAJOR.MINOR.PATCHrcN`. In both cases, use the exact package version with a leading `v`.
 
@@ -143,7 +143,7 @@ Stable releases still use `vMAJOR.MINOR.PATCH`; release candidates use `vMAJOR.M
 2. Confirm `tbot223_base.__version__` matches the intended release version.
 3. Run the compatibility workflow manually if you want a pre-release signal before creating the GitHub Release.
 4. Create the version tag on the `main` commit.
-5. Run `scripts/check-release-readiness.sh --strict-release v1.0.0rc2` or `docker compose run --build --rm check --strict-release v1.0.0rc2`.
-6. Publish a GitHub prerelease from that release-candidate tag.
+5. Run `scripts/check-release-readiness.sh --strict-release v1.0.0` or `docker compose run --build --rm check --strict-release v1.0.0`.
+6. Publish a regular GitHub Release from that stable tag with the prerelease option disabled.
 
 The publish workflow will stop before PyPI upload if the tag, release type, branch ancestry, package version, tests, typing, build, installed wheel, or metadata check does not match the release contract.

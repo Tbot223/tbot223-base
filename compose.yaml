@@ -16,4 +16,4 @@ services:
     working_dir: /workspace
     volumes:
       - .:/workspace
-    command: ["v1.0.0rc2"]
+    command: ["v1.0.0"]

@@ -2,6 +2,16 @@
 
 # Release Notes
 
+## 1.0.0 — 2026-07-10
+
+`1.0.0` promotes the validated `1.0.0rc2` package to the first stable release. It introduces no runtime behavior changes from `1.0.0rc2`.
+
+### Changed
+
+- The package version and runtime/documentation baseline now target `1.0.0`.
+- Package metadata now declares `Development Status :: 5 - Production/Stable`.
+- Installation and release instructions now use the stable `1.0.0` package and `v1.0.0` tag, with GitHub's prerelease option disabled.
+
 ## 1.0.0rc2 — 2026-07-10
 
 `1.0.0rc2` closes the remaining async, typing, and public-payload safety gaps found during the 1.0 release review. No public API removals are included.

@@ -28,4 +28,4 @@ RUN python -m pip install --upgrade pip \
 COPY . .
 
 ENTRYPOINT ["bash", "scripts/check-release-readiness.sh"]
-CMD ["v1.0.0rc2"]
+CMD ["v1.0.0"]

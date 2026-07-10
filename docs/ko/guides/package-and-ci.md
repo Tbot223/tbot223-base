@@ -1,6 +1,6 @@
 [English](../../en/guides/package-and-ci.md)
 
-> 런타임 기준: package version 1.0.0rc2 (`tbot223_base.__version__ == "1.0.0rc2"`).
+> 런타임 기준: package version 1.0.0 (`tbot223_base.__version__ == "1.0.0"`).
 
 # Package and CI Guide
 
@@ -52,13 +52,13 @@ python -m pip install -e ".[test,type,release]"
 그 다음 release readiness check를 실행한다.
 
 ```bash
-scripts/check-release-readiness.sh v1.0.0rc2
+scripts/check-release-readiness.sh v1.0.0
 ```
 
-`v1.0.0rc2` tag가 local에 있고 `HEAD`를 가리키며 working tree가 clean하고 `origin/main`을 확인할 수 있는 상태에서는 strict release mode를 사용한다.
+`v1.0.0` tag가 local에 있고 `HEAD`를 가리키며 working tree가 clean하고 `origin/main`을 확인할 수 있는 상태에서는 strict release mode를 사용한다.
 
 ```bash
-scripts/check-release-readiness.sh --strict-release v1.0.0rc2
+scripts/check-release-readiness.sh --strict-release v1.0.0
 ```
 
 Release gate는 stable `vMAJOR.MINOR.PATCH` tag와 release candidate `vMAJOR.MINOR.PATCHrcN` tag를 모두 허용한다. 앞의 `v`를 제거한 문자열은 여전히 `tbot223_base.__version__`과 정확히 같아야 한다.
@@ -79,7 +79,7 @@ docker compose run --build --rm test
 docker compose run --build --rm check
 ```
 
-`test` service는 `pytest -q`만 실행한다. `check` service는 `test`, `type`, `release` dependency group을 설치하고 `actionlint`를 포함한 image 안에서 `scripts/check-release-readiness.sh v1.0.0rc2`를 실행한다.
+`test` service는 `pytest -q`만 실행한다. `check` service는 `test`, `type`, `release` dependency group을 설치하고 `actionlint`를 포함한 image 안에서 `scripts/check-release-readiness.sh v1.0.0`을 실행한다.
 
 ## Compatibility CI
 
@@ -115,7 +115,7 @@ Compatibility workflow는 push와 pull request에서 자동 실행된다. Releas
 Package를 upload하기 전에 다음을 검증한다.
 
 - release에 tag가 있다.
-- tag가 stable `vMAJOR.MINOR.PATCH` 또는 release candidate `vMAJOR.MINOR.PATCHrcN` 형식을 사용한다. 예: `v1.0.0rc2`.
+- tag가 stable `vMAJOR.MINOR.PATCH` 또는 release candidate `vMAJOR.MINOR.PATCHrcN` 형식을 사용한다. 예: `v1.0.0`.
 - release-candidate tag는 GitHub prerelease로 publish하고 stable tag는 prerelease로 publish하지 않는다.
 - tag가 `origin/main`에 포함된 commit을 가리킨다.
 - 앞의 `v`를 제거한 tag version이 `tbot223_base.__version__`과 일치한다.
@@ -135,7 +135,7 @@ PyPI Trusted Publisher에는 다음 값을 사용한다.
 
 ## 릴리스 체크리스트
 
-`1.0.0rc2`의 expected release tag는 `v1.0.0rc2`다.
+`1.0.0`의 expected release tag는 `v1.0.0`이다.
 
 Stable release는 계속 `vMAJOR.MINOR.PATCH`를 사용하고, release candidate는 `vMAJOR.MINOR.PATCHrcN`를 사용한다. 두 경우 모두 package version 앞에 `v`만 붙인 exact tag를 사용한다.
 
@@ -143,7 +143,7 @@ Stable release는 계속 `vMAJOR.MINOR.PATCH`를 사용하고, release candidate
 2. `tbot223_base.__version__`이 의도한 release version과 일치하는지 확인한다.
 3. GitHub Release를 만들기 전에 신호를 보고 싶으면 compatibility workflow를 manual dispatch로 실행한다.
 4. `main` commit에 version tag를 만든다.
-5. `scripts/check-release-readiness.sh --strict-release v1.0.0rc2` 또는 `docker compose run --build --rm check --strict-release v1.0.0rc2`를 실행한다.
-6. 그 release-candidate tag에서 GitHub prerelease를 publish한다.
+5. `scripts/check-release-readiness.sh --strict-release v1.0.0` 또는 `docker compose run --build --rm check --strict-release v1.0.0`을 실행한다.
+6. 그 stable tag에서 prerelease option을 끈 일반 GitHub Release를 publish한다.
 
 Tag, release type, branch ancestry, package version, tests, typing, build, installed wheel, metadata check가 release contract와 맞지 않으면 publish workflow는 PyPI upload 전에 중단된다.

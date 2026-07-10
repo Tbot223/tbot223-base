@@ -1,6 +1,6 @@
 [한국어 (Korean)](README.ko.md)
 
-> Runtime baseline: package version 1.0.0rc2 (`tbot223_base.__version__ == "1.0.0rc2"`).
+> Runtime baseline: package version 1.0.0 (`tbot223_base.__version__ == "1.0.0"`).
 
 # tbot223-base
 
@@ -47,10 +47,10 @@ This package is not:
 ## Installation
 
 ```bash
-python -m pip install --pre "tbot223-base==1.0.0rc2"
+python -m pip install "tbot223-base==1.0.0"
 ```
 
-For the latest stable release instead, use `python -m pip install tbot223-base`.
+For the latest stable release without pinning a version, use `python -m pip install tbot223-base`.
 
 For local development from a source checkout:
 

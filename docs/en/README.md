@@ -1,6 +1,6 @@
 [한국어 (Korean)](../ko/README.md)
 
-> Runtime baseline: package version 1.0.0rc2 (`tbot223_base.__version__ == "1.0.0rc2"`).
+> Runtime baseline: package version 1.0.0 (`tbot223_base.__version__ == "1.0.0"`).
 
 # tbot223-base Docs
 

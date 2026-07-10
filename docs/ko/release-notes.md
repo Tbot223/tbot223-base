@@ -2,6 +2,16 @@
 
 # 릴리스 노트
 
+## 1.0.0 — 2026-07-10
+
+`1.0.0`은 검증을 마친 `1.0.0rc2` package를 첫 stable release로 승격한다. `1.0.0rc2` 대비 runtime behavior 변경은 없다.
+
+### Changed
+
+- Package version과 runtime/documentation baseline을 `1.0.0`으로 맞췄다.
+- Package metadata가 `Development Status :: 5 - Production/Stable`을 선언한다.
+- 설치 및 release 안내가 stable `1.0.0` package와 `v1.0.0` tag를 사용하고 GitHub prerelease option을 끄도록 정리됐다.
+
 ## 1.0.0rc2 — 2026-07-10
 
 `1.0.0rc2`는 1.0 release review에서 발견한 async, typing, public payload safety gap을 마무리한다. Public API 제거는 없다.
