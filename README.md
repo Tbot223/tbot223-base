@@ -1,6 +1,6 @@
 [한국어 (Korean)](README.ko.md)
 
-> Runtime baseline: package version 0.1.0 (`tbot223_base.__version__ == "0.1.0"`).
+> Runtime baseline: package version 1.0.0rc1 (`tbot223_base.__version__ == "1.0.0rc1"`).
 
 # tbot223-base
 
@@ -101,6 +101,7 @@ User-facing docs:
 - [English docs](docs/en/README.md)
 - [Korean docs](docs/ko/README.md)
 - [Getting Started](docs/en/guides/getting-started.md)
+- [Executable examples](docs/en/guides/examples.md)
 - [Result reference](docs/en/reference/result.md)
 - [ExceptionTracker reference](docs/en/reference/exception-tracker.md)
 - [API contract](docs/contracts/en/human/api-contract.md)

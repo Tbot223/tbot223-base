@@ -1,6 +1,10 @@
+from concurrent.futures import ThreadPoolExecutor
 import gc
+import sys
 import weakref
+from typing import Dict, cast
 
+import pytest
 import tbot223_base
 from tbot223_base import exception_tracker
 from tbot223_base.exception_tracker import ExceptionTracker, ExceptionTrackerDecorator
@@ -13,6 +17,23 @@ class _LargeContext:
 
     def __repr__(self):
         raise AssertionError("custom repr should not be called")
+
+
+class _CustomText(str):
+    pass
+
+
+class _CustomInteger(int):
+    pass
+
+
+class _CustomFloat(float):
+    pass
+
+
+class _SelfFormattingError(Exception):
+    def __str__(self):
+        raise self
 
 
 def _raise_zero_division_error():
@@ -60,6 +81,17 @@ def _raise_context_without_cause():
         int("nan")
     except ValueError:
         raise RuntimeError("context wrapper")
+
+
+def _raise_threaded_worker_error(worker_id):
+    raise RuntimeError(f"worker-{worker_id}")
+
+
+def _raise_with_scalar_subclass_locals():
+    local_text = _CustomText("blocked-local")
+    local_number = _CustomInteger(7)
+    local_float = _CustomFloat(2.5)
+    raise RuntimeError(f"{local_text}-{local_number}-{local_float}")
 
 
 def test_get_exception_location_points_to_origin_frame():
@@ -122,6 +154,102 @@ def test_get_exception_info_tracks_chained_causes():
 
     assert result.status is ResultStatus.FAILURE
     assert result.data["causes"][0]["type"] == "ValueError"
+
+
+def test_exception_tracker_reuses_one_instance_across_threads():
+    tracker = ExceptionTracker()
+
+    def run_worker(worker_id):
+        try:
+            _raise_threaded_worker_error(worker_id)
+        except Exception as error:
+            result = tracker.get_exception_info(
+                error,
+                user_input=f"user-{worker_id}",
+                params=((worker_id,), {"worker": worker_id}),
+                mask_presets=(),
+            )
+            return cast(Dict[str, object], result.data)
+
+    worker_ids = tuple(range(8))
+    with ThreadPoolExecutor(max_workers=4) as executor:
+        payloads = list(executor.map(run_worker, worker_ids))
+
+    payload_ids = [payload["id"] for payload in payloads]
+    started_at_snapshots = []
+
+    for worker_id, payload in zip(worker_ids, payloads):
+        error_info = cast(Dict[str, object], payload["error"])
+        input_context = cast(Dict[str, object], payload["input_context"])
+        params_context = cast(Dict[str, object], input_context["params"])
+        location = cast(Dict[str, object], payload["location"])
+        origin_location = cast(Dict[str, object], location["origin"])
+        system_info = cast(Dict[str, object], payload["system_info"])
+
+        assert error_info["message"] == f"worker-{worker_id}"
+        assert input_context["user_input"] == f"user-{worker_id}"
+        assert params_context["args"] == (worker_id,)
+        assert params_context["kwargs"] == {"worker": worker_id}
+        assert origin_location["function"] == "_raise_threaded_worker_error"
+        started_at_snapshots.append(system_info["started_at"])
+
+    assert len(set(payload_ids)) == len(worker_ids)
+    assert len({id(snapshot) for snapshot in started_at_snapshots}) == len(worker_ids)
+
+
+def test_get_exception_return_reuses_debug_info_result_shape():
+    tracker = ExceptionTracker()
+
+    try:
+        _raise_zero_division_error()
+    except Exception as error:
+        info_result = tracker.get_exception_info(error, mask_presets=())
+        return_result = tracker.get_exception_return(error, mask_presets=())
+
+    assert return_result.status is ResultStatus.FAILURE
+    assert return_result.error == info_result.error == "ZeroDivisionError: division by zero"
+    assert return_result.context == info_result.context
+    assert return_result.data["error"] == info_result.data["error"]
+    assert return_result.data["location"] == info_result.data["location"]
+
+
+def test_get_exception_info_masks_origin_before_result_context_derivation():
+    tracker = ExceptionTracker()
+
+    try:
+        _raise_zero_division_error()
+    except Exception as error:
+        masked_result = tracker.get_exception_info(
+            error,
+            mask_presets=(),
+            mask_paths=["location.origin"],
+        )
+        partial_result = tracker.get_exception_info(
+            error,
+            mask_presets=(),
+            mask_paths=["location.origin.function"],
+        )
+
+    assert masked_result.context == "<unknown>"
+    assert masked_result.data["location"]["origin"] == ExceptionTracker.MASKED_VALUE
+    assert partial_result.data["location"]["origin"]["function"] == ExceptionTracker.MASKED_VALUE
+    assert partial_result.context.endswith(f"in {ExceptionTracker.MASKED_VALUE}")
+
+
+def test_get_exception_return_masks_origin_before_result_context_derivation():
+    tracker = ExceptionTracker()
+
+    try:
+        _raise_zero_division_error()
+    except Exception as error:
+        result = tracker.get_exception_return(
+            error,
+            mask_presets=(),
+            mask_paths=["location.origin"],
+        )
+
+    assert result.context == "<unknown>"
+    assert result.data["location"]["origin"] == ExceptionTracker.MASKED_VALUE
 
 
 def test_get_exception_info_does_not_retain_raw_context_objects():
@@ -335,6 +463,38 @@ def test_get_system_info_collects_only_bounded_environment_variables(monkeypatch
     assert helper._get_small_environment_variables() == {}
 
 
+def test_get_system_info_uses_argument_and_path_snapshots():
+    info = exception_tracker.ExceptionTrackerHelper.get_system_info()
+
+    assert info["Command_Args"] == sys.argv
+    assert info["Command_Args"] is not sys.argv
+    assert info["Python_Path"] == sys.path
+    assert info["Python_Path"] is not sys.path
+
+
+def test_debug_system_info_started_at_is_isolated_between_payloads():
+    tracker = ExceptionTracker()
+
+    def capture_payload(message):
+        try:
+            raise RuntimeError(message)
+        except Exception as error:
+            result = tracker.get_exception_info(error, mask_presets=())
+            return cast(Dict[str, object], result.data)
+
+    first_payload = capture_payload("first")
+    first_system_info = cast(Dict[str, object], first_payload["system_info"])
+    first_started_at = cast(Dict[str, object], first_system_info["started_at"])
+    first_started_at["mutated"] = True
+
+    second_payload = capture_payload("second")
+    second_system_info = cast(Dict[str, object], second_payload["system_info"])
+    second_started_at = cast(Dict[str, object], second_system_info["started_at"])
+
+    assert first_started_at is not second_started_at
+    assert "mutated" not in second_started_at
+
+
 def test_format_location_and_traceback_helpers_handle_missing_values():
     tracker = ExceptionTracker()
     empty_error = RuntimeError("not raised")
@@ -358,6 +518,11 @@ def test_normalize_helpers_accept_invalid_and_duplicate_inputs():
     assert tracker._normalize_limit(-1) == ExceptionTracker.DEFAULT_TRACEBACK_LIMIT
     assert tracker._normalize_limit(ExceptionTracker.MAX_TRACEBACK_LIMIT + 1) == ExceptionTracker.MAX_TRACEBACK_LIMIT
     assert tracker._normalize_limit(0) == 0
+    assert tracker._normalize_exception_params(((1, 2), {"mode": "test"})) == (
+        (1, 2),
+        {"mode": "test"},
+    )
+    assert tracker._normalize_exception_params(("bad", "shape")) == ((), {})
     assert tracker._normalize_mask_paths(None) == ()
     assert tracker._normalize_mask_paths("location.origin") == (("location", "origin"),)
     assert tracker._normalize_mask_paths(("error", "message")) == (("error", "message"),)
@@ -378,6 +543,11 @@ def test_normalize_helpers_accept_invalid_and_duplicate_inputs():
         ("traceback",),
         ("traceback_frames",),
     )
+
+
+def test_mask_presets_are_read_only():
+    with pytest.raises(TypeError):
+        cast(dict[str, object], ExceptionTracker.MASK_PRESETS)["custom"] = ()
 
 
 def test_mask_paths_ignores_missing_and_masks_existing_values():
@@ -430,6 +600,47 @@ def test_copy_safe_context_keeps_small_values_and_blocks_heavy_values():
     assert ExceptionTracker._copy_safe_context("x" * (ExceptionTracker.CONTEXT_MAX_VALUE_LENGTH + 1)) == ExceptionTracker.BLOCKED_VALUE
     assert ExceptionTracker._copy_safe_context(list(range(ExceptionTracker.CONTEXT_MAX_ITEMS + 1))) == ExceptionTracker.BLOCKED_VALUE
     assert ExceptionTracker._copy_safe_context({f"key_{index}": index for index in range(ExceptionTracker.CONTEXT_MAX_ITEMS + 1)}) == ExceptionTracker.BLOCKED_VALUE
+
+
+def test_copy_safe_context_blocks_scalar_subclasses_without_retaining_identity():
+    text = _CustomText("ok")
+    number = _CustomInteger(1)
+    floating = _CustomFloat(2.5)
+
+    for value in (text, number, floating):
+        is_small, copied_value = ExceptionTracker._copy_safe_context_primitive(value)
+
+        assert is_small is False
+        assert copied_value == ExceptionTracker.BLOCKED_VALUE
+        assert copied_value is not value
+
+
+def test_get_exception_info_blocks_scalar_subclasses_in_debug_context():
+    tracker = ExceptionTracker()
+    text = _CustomText("blocked-user")
+    number = _CustomInteger(3)
+    floating = _CustomFloat(4.5)
+
+    try:
+        _raise_with_scalar_subclass_locals()
+    except Exception as error:
+        result = tracker.get_exception_info(
+            error,
+            user_input=text,
+            params=((number,), {"value": floating}),
+            mask_presets=(),
+        )
+
+    context = result.data["input_context"]
+    assert context["user_input"] == ExceptionTracker.BLOCKED_VALUE
+    assert context["params"]["args"] == (ExceptionTracker.BLOCKED_VALUE,)
+    assert context["params"]["kwargs"]["value"] == ExceptionTracker.BLOCKED_VALUE
+    assert context["local_variables"]["local_text"] == ExceptionTracker.BLOCKED_VALUE
+    assert context["local_variables"]["local_number"] == ExceptionTracker.BLOCKED_VALUE
+    assert context["local_variables"]["local_float"] == ExceptionTracker.BLOCKED_VALUE
+    assert not _contains_identity(result.data, text)
+    assert not _contains_identity(result.data, number)
+    assert not _contains_identity(result.data, floating)
 
 
 def test_exception_causes_breaks_cycles():
@@ -517,14 +728,8 @@ def test_public_exception_info_normalizes_invalid_inputs_and_fallback(monkeypatc
     assert result.data["tags"] == {}
     assert result.data["retryable"] is None
 
-    original_builder = ExceptionTracker._build_public_error_info
-    builder_calls = {"count": 0}
-
     def broken_builder(*args, **kwargs):
-        builder_calls["count"] += 1
-        if builder_calls["count"] == 1:
-            raise RuntimeError("builder broke")
-        return original_builder(**kwargs)
+        raise RuntimeError("builder broke")
 
     monkeypatch.setattr(ExceptionTracker, "_build_public_error_info", broken_builder)
     fallback = tracker.get_public_exception_info(RuntimeError("boom"), public_context="Public.Context")
@@ -653,6 +858,33 @@ def test_exception_tracker_decorator_converts_exception_to_result():
     assert isinstance(result, Result)
     assert result.status is ResultStatus.FAILURE
     assert result.data["input_context"]["params"] == ExceptionTracker.MASKED_VALUE
+
+
+def test_get_exception_info_handles_unprintable_exception_text():
+    tracker = ExceptionTracker()
+
+    try:
+        raise _SelfFormattingError()
+    except Exception as error:
+        result = tracker.get_exception_info(error, mask_presets=())
+
+    assert result.status is ResultStatus.FAILURE
+    assert result.error == "_SelfFormattingError: <unprintable _SelfFormattingError>"
+    assert result.data["quick_info"] == result.error
+    assert result.data["error"]["message"] == "<unprintable _SelfFormattingError>"
+
+
+def test_exception_tracker_decorator_returns_failure_result_for_unprintable_exception():
+    @ExceptionTrackerDecorator(mask_presets=())
+    def explode():
+        raise _SelfFormattingError()
+
+    result = explode()
+
+    assert isinstance(result, Result)
+    assert result.status is ResultStatus.FAILURE
+    assert result.error == "_SelfFormattingError: <unprintable _SelfFormattingError>"
+    assert result.data["error"]["message"] == "<unprintable _SelfFormattingError>"
 
 
 def test_exception_tracker_decorator_preserves_success_return_and_default_tracker():

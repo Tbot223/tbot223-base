@@ -1,6 +1,6 @@
 [한국어 (Korean)](../../ko/guides/package-and-ci.md)
 
-> Runtime baseline: package version 0.1.0 (`tbot223_base.__version__ == "0.1.0"`).
+> Runtime baseline: package version 1.0.0rc1 (`tbot223_base.__version__ == "1.0.0rc1"`).
 
 # Package and CI Guide
 
@@ -49,14 +49,16 @@ python -m pip install -e ".[test,release]"
 Then run the release readiness check.
 
 ```bash
-scripts/check-release-readiness.sh v0.1.0
+scripts/check-release-readiness.sh v1.0.0rc1
 ```
 
-Use strict release mode after the `v0.1.0` tag exists locally and `origin/main` is available.
+Use strict release mode after the `v1.0.0rc1` tag exists locally and `origin/main` is available.
 
 ```bash
-scripts/check-release-readiness.sh --strict-release v0.1.0
+scripts/check-release-readiness.sh --strict-release v1.0.0rc1
 ```
+
+Release gates accept stable `vMAJOR.MINOR.PATCH` tags and release-candidate `vMAJOR.MINOR.PATCHrcN` tags. After removing the leading `v`, the tag text must still exactly match `tbot223_base.__version__`.
 
 The script runs metadata checks, Python compile checks, `pytest`, `actionlint`, `git diff --check`, temporary source/wheel builds, `twine check`, and distribution metadata assertions.
 
@@ -74,7 +76,7 @@ docker compose run --build --rm test
 docker compose run --build --rm check
 ```
 
-The `test` service runs only `pytest -q`. The `check` service runs `scripts/check-release-readiness.sh v0.1.0` inside an image that installs the `test` and `release` dependency groups and includes `actionlint`.
+The `test` service runs only `pytest -q`. The `check` service runs `scripts/check-release-readiness.sh v1.0.0rc1` inside an image that installs the `test` and `release` dependency groups and includes `actionlint`.
 
 ## Compatibility CI
 
@@ -109,7 +111,7 @@ The workflow at `.github/workflows/publish.yml` runs only when a GitHub Release 
 Before uploading anything, it validates:
 
 - the release has a tag.
-- the tag uses `vMAJOR.MINOR.PATCH` format, for example `v0.1.0`.
+- the tag uses stable `vMAJOR.MINOR.PATCH` or release-candidate `vMAJOR.MINOR.PATCHrcN` format, for example `v1.0.0rc1`.
 - the tag points to a commit contained in `origin/main`.
 - the tag version matches `tbot223_base.__version__` after removing the leading `v`.
 - the Python compatibility matrix passes.
@@ -127,13 +129,15 @@ Use these PyPI Trusted Publisher values:
 
 ## Release Checklist
 
-For `0.1.0`, the expected release tag is `v0.1.0`.
+For `1.0.0rc1`, the expected release tag is `v1.0.0rc1`.
+
+Stable releases still use `vMAJOR.MINOR.PATCH`; release candidates use `vMAJOR.MINOR.PATCHrcN`. In both cases, use the exact package version with a leading `v`.
 
 1. Merge or fast-forward the release commit onto `main`.
 2. Confirm `tbot223_base.__version__` matches the intended release version.
 3. Run the compatibility workflow manually if you want a pre-release signal before creating the GitHub Release.
 4. Create the version tag on the `main` commit.
-5. Run `scripts/check-release-readiness.sh --strict-release v0.1.0` or `docker compose run --build --rm check --strict-release v0.1.0`.
+5. Run `scripts/check-release-readiness.sh --strict-release v1.0.0rc1` or `docker compose run --build --rm check --strict-release v1.0.0rc1`.
 6. Publish a GitHub Release from that tag.
 
 The publish workflow will stop before PyPI upload if the tag, branch ancestry, package version, tests, build, or metadata check does not match the release contract.

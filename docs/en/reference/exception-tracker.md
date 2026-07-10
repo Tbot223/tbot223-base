@@ -1,6 +1,6 @@
 [한국어 (Korean)](../../ko/reference/exception-tracker.md)
 
-> Runtime baseline: package version 0.1.0 (`tbot223_base.__version__ == "0.1.0"`).
+> Runtime baseline: package version 1.0.0rc1 (`tbot223_base.__version__ == "1.0.0rc1"`).
 
 # ExceptionTracker Reference
 
@@ -38,6 +38,14 @@ Small primitives and primitive-only `list`/`tuple` values are copied. Top-level 
 
 Debug payloads include system information for internal diagnostics. Environment variables are copied only when the key is a small string and the value is a small primitive or shallow tuple/list of small primitives; collection stops at `ENVIRONMENT_VARIABLE_MAX_COUNT` entries. Small environment values can still be sensitive, so mask `system_info` before exposing debug payloads outside a trusted boundary.
 
+## Thread Concurrency
+
+`ExceptionTracker` instances are intended to be reusable across concurrent thread calls. Debug payloads are created fresh per call, and startup system information is copied into each payload rather than shared by reference.
+
+Returned payload dictionaries remain mutable. If callers mutate or share returned payloads across threads, they should provide their own synchronization. `Result` is immutable as a container, but `Result.data` can still contain mutable user payloads.
+
+This guarantee is thread-focused. It does not add multiprocessing behavior or cross-process shared-state guarantees.
+
 ## Mask Presets
 
 | Preset | Effect |
@@ -49,7 +57,7 @@ Debug payloads include system information for internal diagnostics. Environment 
 | `traceback` | Masks causes, traceback text, and traceback frames. |
 | `system_info` | Masks system information. |
 
-Explicit `mask_paths` can also mask dot paths such as `"location.origin"` or tuple paths such as `("error", "message")`.
+Explicit `mask_paths` can also mask dot paths such as `"location.origin"` or tuple paths such as `("error", "message")`. When a debug `Result.context` string is derived from `location.origin`, the masked origin is reflected there as well.
 
 ## Public Example
 

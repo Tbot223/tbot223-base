@@ -1,6 +1,6 @@
 [English](../../en/guides/getting-started.md)
 
-> 런타임 기준: package version 0.1.0 (`tbot223_base.__version__ == "0.1.0"`).
+> 런타임 기준: package version 1.0.0rc1 (`tbot223_base.__version__ == "1.0.0rc1"`).
 
 # Getting Started
 

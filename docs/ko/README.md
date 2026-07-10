@@ -1,6 +1,6 @@
 [English](../en/README.md)
 
-> 런타임 기준: package version 0.1.0 (`tbot223_base.__version__ == "0.1.0"`).
+> 런타임 기준: package version 1.0.0rc1 (`tbot223_base.__version__ == "1.0.0rc1"`).
 
 # tbot223-base 문서
 
@@ -10,6 +10,7 @@
 
 - [Root README](../../README.ko.md): 프로젝트 개요, 설계 의도, 맞는 사용자, 트레이드오프, 빠른 시작.
 - [Getting Started](guides/getting-started.md): checkout 또는 editable install 기준 import와 핵심 API 사용법.
+- [실행 가능한 예시](guides/examples.md): `examples/` 아래의 standalone script로 `Result`와 `ExceptionTracker` 흐름 실행.
 - [Package and CI Guide](guides/package-and-ci.md): `pyproject.toml`, editable install, compatibility CI, release publishing 사용법.
 
 ## 레퍼런스
