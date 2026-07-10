@@ -4,20 +4,21 @@ set -euo pipefail
 usage() {
   cat <<'USAGE'
 Usage:
-  scripts/check-release-readiness.sh [--strict-release] [vMAJOR.MINOR.PATCH]
+  scripts/check-release-readiness.sh [--strict-release] [vMAJOR.MINOR.PATCH|vMAJOR.MINOR.PATCHrcN]
 
 Checks tests, package metadata, GitHub Actions workflow syntax, source/wheel
 builds, twine metadata validation, and release tag/version consistency.
 
 Examples:
   scripts/check-release-readiness.sh
-  scripts/check-release-readiness.sh v0.1.0
-  scripts/check-release-readiness.sh --strict-release v0.1.0
+  scripts/check-release-readiness.sh v1.0.0rc1
+  scripts/check-release-readiness.sh --strict-release v1.0.0rc1
 USAGE
 }
 
 STRICT_RELEASE=0
 RELEASE_TAG=""
+RELEASE_TAG_REGEX='^v[0-9]+\.[0-9]+\.[0-9]+(rc[0-9]+)?$'
 
 while [[ $# -gt 0 ]]; do
   case "$1" in
@@ -72,8 +73,8 @@ if [[ -z "${RELEASE_TAG}" ]]; then
   echo "Release tag not provided; using ${RELEASE_TAG} from package version."
 fi
 
-if [[ ! "${RELEASE_TAG}" =~ ^v[0-9]+\.[0-9]+\.[0-9]+$ ]]; then
-  echo "Release tag must use vMAJOR.MINOR.PATCH format, for example v0.1.0." >&2
+if [[ ! "${RELEASE_TAG}" =~ ${RELEASE_TAG_REGEX} ]]; then
+  echo "Release tag must use stable vMAJOR.MINOR.PATCH or release-candidate vMAJOR.MINOR.PATCHrcN format, for example v1.0.0rc1." >&2
   exit 1
 fi
 
@@ -87,7 +88,10 @@ fi
 echo "Checking package metadata baseline..."
 python - <<'PY'
 import pathlib
-import tomllib
+try:
+    import tomllib
+except ModuleNotFoundError:
+    import tomli as tomllib
 
 from tbot223_base import __version__
 

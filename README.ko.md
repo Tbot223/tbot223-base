@@ -1,6 +1,6 @@
 [English](README.md)
 
-> 런타임 기준: package version 0.1.0 (`tbot223_base.__version__ == "0.1.0"`).
+> 런타임 기준: package version 1.0.0rc1 (`tbot223_base.__version__ == "1.0.0rc1"`).
 
 # tbot223-base
 
@@ -101,6 +101,7 @@ except Exception as error:
 - [한국어 문서](docs/ko/README.md)
 - [English docs](docs/en/README.md)
 - [Getting Started](docs/ko/guides/getting-started.md)
+- [실행 가능한 예시](docs/ko/guides/examples.md)
 - [Result reference](docs/ko/reference/result.md)
 - [ExceptionTracker reference](docs/ko/reference/exception-tracker.md)
 - [API 계약](docs/contracts/ko/human/api-contract.md)

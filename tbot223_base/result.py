@@ -1,4 +1,5 @@
 # external modules
+from collections.abc import Iterable
 from enum import Enum
 from typing import TYPE_CHECKING, Generic, NamedTuple, Optional, TypeVar, Union, cast
 
@@ -63,10 +64,10 @@ class ResultUnwrapException(RuntimeError):
         ### Example
         >>> from tbot223_base.result import Result, ResultStatus, ResultUnwrapException
         >>> try:
-        >>>     result = Result(status=ResultStatus.FAILURE, error="Some error", context="TestContext", data=None)
-        >>>     result.unwrap()
-        >>> except ResultUnwrapException as e:
-        >>>     print(e)
+        ...     result = Result(status=ResultStatus.FAILURE, error="Some error", context="TestContext", data=None)
+        ...     result.unwrap()
+        ... except ResultUnwrapException as e:
+        ...     print(e)
         """
         super().__init__(f"Cannot unwrap Result: {error}, Context: {context}, Data: {data}")
         self.error = error
@@ -121,7 +122,7 @@ class Result(_ResultBase[_DataT], Generic[_DataT]):
     >>> from tbot223_base.result import Result, ResultStatus
     >>> result: Result[dict[str, str]] = Result(status=ResultStatus.SUCCESS, error=None, context="FetchData", data={"key": "value"})
     >>> if result.is_success:
-    >>>     print("Operation succeeded with data:", result.data)
+    ...     print("Operation succeeded with data:", result.data)
     """
 
     __slots__ = ()
@@ -145,6 +146,14 @@ class Result(_ResultBase[_DataT], Generic[_DataT]):
 
         normalized_status = ResultStatus.normalize(status)
         return cast("Result[_DataT]", tuple.__new__(cls, (normalized_status, error, context, data)))
+
+    @classmethod
+    def _make(cls: type["Result[_DataT]"], iterable: Iterable[object]) -> "Result[_DataT]":
+        result = super()._make(iterable)
+        return cls(result.status, result.error, result.context, cast(_DataT, result.data))
+
+    def _replace(self, /, **kwds: object) -> "Result[_DataT]":
+        return cast("Result[_DataT]", super()._replace(**kwds))
 
     @property
     def success(self) -> Optional[bool]:

@@ -2,6 +2,23 @@
 
 # 릴리스 노트
 
+## 1.0.0rc1 — 2026-07-10
+
+`1.0.0rc1`은 1.0 API 안정화를 위한 release candidate다. 이번 release candidate에는 public API 제거가 없다.
+
+### Changed
+
+- `Result._make()`와 `Result._replace()`가 이제 `ResultStatus.normalize()`를 거쳐 값을 다시 구성하므로, 재구성된 result도 직접 생성한 경우와 같은 success/failure/cancelled 정규화 불변식을 유지한다.
+- Debug context safe-copy 규칙이 이제 `str`, `int`, `float` 같은 scalar primitive의 custom subclass를 일반 built-in scalar로 취급하지 않고 차단한다.
+- 명시적인 `location.origin` mask는 이제 formatting에 사용되는 파생 debug `Result.context` 문자열에도 반영되며, 부분 origin mask도 같은 규칙을 따른다.
+- 출력할 수 없는 exception text는 이제 failure `Result` / decorator boundary 밖으로 새지 않고 `<unprintable ...>` fallback으로 처리된다.
+- 각 debug payload는 이제 `system_info.now`와 복사된 `system_info.started_at`에 대해 호출별로 분리된 snapshot을 가지며, 문서와 예시는 하나의 tracker instance를 여러 thread에서 안전하게 재사용하는 방법을 설명한다.
+- 문서는 public-safe payload 경로를 언제 써야 하는지, trusted-only debug payload에도 여전히 어떤 masking이 필요한지, 그리고 어떤 보안 경계를 caller가 직접 책임져야 하는지를 더 명확히 설명한다.
+- 실행 가능한 `Result` / `ExceptionTracker` 예시와 이에 맞춘 영문/국문 examples guide를 추가했다.
+- Host-side release tooling은 `tomllib`가 없는 경우 `tomli` fallback을 사용해 Python 3.10도 지원한다.
+- Release gate는 이제 exact-match stable tag(`vMAJOR.MINOR.PATCH`)와 release candidate tag(`vMAJOR.MINOR.PATCHrcN`)를 모두 허용하며, runtime/documentation baseline도 `1.0.0rc1`로 맞췄다.
+- Release 검증 범위는 이제 Python 3.10-3.14 compatibility, Docker release check 경로, package build + `twine check`, `actionlint` 기반 workflow linting까지 포함한다.
+
 ## 0.1.0
 
 ### Added

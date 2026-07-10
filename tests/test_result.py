@@ -34,6 +34,51 @@ def test_result_accepts_status_and_success_shorthand_inputs():
     assert shorthand.success is False
 
 
+@pytest.mark.parametrize(
+    ("status", "expected_status"),
+    [
+        (ResultStatus.SUCCESS, ResultStatus.SUCCESS),
+        (True, ResultStatus.SUCCESS),
+        (False, ResultStatus.FAILURE),
+        (None, ResultStatus.CANCELLED),
+        (" cancelled ", ResultStatus.CANCELLED),
+    ],
+)
+def test_result_make_and_replace_normalize_reconstructed_status(status, expected_status):
+    reconstructed = Result._make([status, None, "Reconstructed", 123])
+    replaced = reconstructed._replace(status=status)
+
+    assert reconstructed.status is expected_status
+    assert replaced.status is expected_status
+    assert replaced.context == "Reconstructed"
+
+
+def test_result_reconstruction_preserves_namedtuple_behavior():
+    class DerivedResult(Result[int]):
+        pass
+
+    result = DerivedResult._make(["success", None, "Derived", 1])
+    replaced = result._replace(data=2)
+
+    assert isinstance(result, DerivedResult)
+    assert result.status is ResultStatus.SUCCESS
+    assert replaced == DerivedResult(ResultStatus.SUCCESS, None, "Derived", 2)
+
+    with pytest.raises(TypeError):
+        Result._make([ResultStatus.SUCCESS])
+
+    with pytest.raises((TypeError, ValueError)):
+        result._replace(extra=3)
+
+
+def test_result_reconstruction_rejects_invalid_status():
+    with pytest.raises(ValueError):
+        Result._make(["invalid", None, "Reconstructed", 123])
+
+    with pytest.raises(ValueError):
+        Result(ResultStatus.SUCCESS, None, "Original", 123)._replace(status="invalid")
+
+
 def test_result_supports_generic_runtime_subscription():
     result = Result[int](ResultStatus.SUCCESS, None, "Typed", 123)
 

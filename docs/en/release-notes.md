@@ -2,6 +2,23 @@
 
 # Release Notes
 
+## 1.0.0rc1 — 2026-07-10
+
+`1.0.0rc1` is the 1.0 API-stabilization release candidate. No public API removals are included in this release candidate.
+
+### Changed
+
+- `Result._make()` and `Result._replace()` now reconstruct values through `ResultStatus.normalize()` so reconstructed results keep the same normalized success/failure/cancelled invariant as direct construction.
+- Debug-context safe-copy rules now block custom subclasses of scalar primitives such as `str`, `int`, and `float` instead of treating them as plain built-in scalars.
+- Explicit `location.origin` masks now also affect the derived debug `Result.context` string, including partial origin masks that feed the formatted context.
+- Unprintable exception text now falls back to `<unprintable ...>` while staying inside the failure `Result` / decorator boundary.
+- Each debug payload now gets isolated per-call snapshots for `system_info.now` and copied `system_info.started_at`, and the docs/examples now document safe reuse of one tracker instance across threads.
+- Documentation now clarifies the public-safe payload path, when debug masking is still required for trusted-only payloads, and which security boundaries the caller still owns.
+- Added executable `Result` and `ExceptionTracker` examples plus aligned English/Korean examples guides.
+- Host-side release tooling now supports Python 3.10 through the `tomli` fallback when `tomllib` is unavailable.
+- Release gates now accept exact-match stable tags (`vMAJOR.MINOR.PATCH`) and release-candidate tags (`vMAJOR.MINOR.PATCHrcN`), and the runtime/documentation baseline now targets `1.0.0rc1`.
+- Release verification now covers Python 3.10-3.14 compatibility, the Docker release-check path, package build plus `twine check`, and workflow linting with `actionlint`.
+
 ## 0.1.0
 
 ### Added
