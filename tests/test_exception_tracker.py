@@ -1,12 +1,13 @@
 import asyncio
-from concurrent.futures import ThreadPoolExecutor
 import gc
 import json
 import sys
 import weakref
+from concurrent.futures import ThreadPoolExecutor
 from typing import Dict, cast
 
 import pytest
+
 import tbot223_base
 from tbot223_base import exception_tracker
 from tbot223_base.exception_tracker import ExceptionTracker, ExceptionTrackerDecorator
@@ -209,7 +210,11 @@ def test_get_exception_return_reuses_debug_info_result_shape():
         return_result = tracker.get_exception_return(error, mask_presets=())
 
     assert return_result.status is ResultStatus.FAILURE
-    assert return_result.error == info_result.error == "ZeroDivisionError: division by zero"
+    assert (
+        return_result.error
+        == info_result.error
+        == "ZeroDivisionError: division by zero"
+    )
     assert return_result.context == info_result.context
     assert return_result.data["error"] == info_result.data["error"]
     assert return_result.data["location"] == info_result.data["location"]
@@ -234,7 +239,10 @@ def test_get_exception_info_masks_origin_before_result_context_derivation():
 
     assert masked_result.context == "<unknown>"
     assert masked_result.data["location"]["origin"] == ExceptionTracker.MASKED_VALUE
-    assert partial_result.data["location"]["origin"]["function"] == ExceptionTracker.MASKED_VALUE
+    assert (
+        partial_result.data["location"]["origin"]["function"]
+        == ExceptionTracker.MASKED_VALUE
+    )
     assert partial_result.context.endswith(f"in {ExceptionTracker.MASKED_VALUE}")
 
 
@@ -270,10 +278,20 @@ def test_get_exception_info_does_not_retain_raw_context_objects():
 
     assert result.status is ResultStatus.FAILURE
     assert not _contains_identity(result.data, large_context)
-    assert result.data["input_context"]["params"]["args"] == (ExceptionTracker.BLOCKED_VALUE,)
-    assert result.data["input_context"]["params"]["kwargs"]["context"] == ExceptionTracker.BLOCKED_VALUE
-    assert result.data["input_context"]["local_variables"]["local_payload"] == ExceptionTracker.BLOCKED_VALUE
-    assert result.data["input_context"]["local_variables"]["local_list"] == [ExceptionTracker.BLOCKED_VALUE]
+    assert result.data["input_context"]["params"]["args"] == (
+        ExceptionTracker.BLOCKED_VALUE,
+    )
+    assert (
+        result.data["input_context"]["params"]["kwargs"]["context"]
+        == ExceptionTracker.BLOCKED_VALUE
+    )
+    assert (
+        result.data["input_context"]["local_variables"]["local_payload"]
+        == ExceptionTracker.BLOCKED_VALUE
+    )
+    assert result.data["input_context"]["local_variables"]["local_list"] == [
+        ExceptionTracker.BLOCKED_VALUE
+    ]
 
     del large_context
     gc.collect()
@@ -286,8 +304,7 @@ def test_get_exception_info_blocks_large_values_and_heavy_objects():
     long_text = "x" * (ExceptionTracker.CONTEXT_MAX_VALUE_LENGTH + 1)
     large_list = list(range(ExceptionTracker.CONTEXT_MAX_ITEMS + 1))
     large_dict = {
-        f"key_{index}": index
-        for index in range(ExceptionTracker.CONTEXT_MAX_ITEMS + 1)
+        f"key_{index}": index for index in range(ExceptionTracker.CONTEXT_MAX_ITEMS + 1)
     }
     custom_context = _LargeContext()
     small_tuple = ("ok", 1, True, None)
@@ -339,7 +356,9 @@ def test_get_exception_info_masks_after_context_capture():
         )
 
     assert result.data["input_context"]["params"] == ExceptionTracker.MASKED_VALUE
-    assert result.data["input_context"]["local_variables"] == ExceptionTracker.MASKED_VALUE
+    assert (
+        result.data["input_context"]["local_variables"] == ExceptionTracker.MASKED_VALUE
+    )
 
 
 def test_get_exception_info_exposes_safe_context_when_unmasked():
@@ -358,13 +377,17 @@ def test_get_exception_info_exposes_safe_context_when_unmasked():
 
 def test_exception_tracker_helper_structures_are_independent():
     info = exception_tracker.ExceptionTrackerHelper.get_error_info_structure()
-    public_info = exception_tracker.ExceptionTrackerHelper.get_public_error_info_structure()
+    public_info = (
+        exception_tracker.ExceptionTrackerHelper.get_public_error_info_structure()
+    )
 
     info["input_context"]["params"]["args"] = ("changed",)
     public_info["tags"]["changed"] = True
 
     fresh_info = exception_tracker.ExceptionTrackerHelper.get_error_info_structure()
-    fresh_public_info = exception_tracker.ExceptionTrackerHelper.get_public_error_info_structure()
+    fresh_public_info = (
+        exception_tracker.ExceptionTrackerHelper.get_public_error_info_structure()
+    )
 
     assert fresh_info["input_context"]["params"]["args"] is None
     assert fresh_public_info["tags"] == {}
@@ -375,7 +398,9 @@ def test_get_system_info_handles_unavailable_cwd(monkeypatch):
 
     denied_info = exception_tracker.ExceptionTrackerHelper.get_system_info()
 
-    assert denied_info["Current_Working_Directory"] == "<Permission Denied or Unavailable>"
+    assert (
+        denied_info["Current_Working_Directory"] == "<Permission Denied or Unavailable>"
+    )
 
     def broken_getcwd():
         raise RuntimeError("cwd failed")
@@ -384,7 +409,9 @@ def test_get_system_info_handles_unavailable_cwd(monkeypatch):
 
     error_info = exception_tracker.ExceptionTrackerHelper.get_system_info()
 
-    assert error_info["Current_Working_Directory"] == "<Permission Denied or Unavailable>"
+    assert (
+        error_info["Current_Working_Directory"] == "<Permission Denied or Unavailable>"
+    )
 
 
 def test_get_system_info_collects_only_bounded_environment_variables(monkeypatch):
@@ -542,7 +569,11 @@ def test_format_location_and_traceback_helpers_handle_missing_values():
     empty_error = RuntimeError("not raised")
 
     assert tracker._format_location({"file": None}) == "<unknown>"
-    assert tracker._frame_to_location(None) == {"file": None, "line": None, "function": None}
+    assert tracker._frame_to_location(None) == {
+        "file": None,
+        "line": None,
+        "function": None,
+    }
     assert tracker._frame_to_traceback_frame(None) == {
         "file": None,
         "line": None,
@@ -558,7 +589,10 @@ def test_normalize_helpers_accept_invalid_and_duplicate_inputs():
 
     assert tracker._normalize_limit("bad") == ExceptionTracker.DEFAULT_TRACEBACK_LIMIT
     assert tracker._normalize_limit(-1) == ExceptionTracker.DEFAULT_TRACEBACK_LIMIT
-    assert tracker._normalize_limit(ExceptionTracker.MAX_TRACEBACK_LIMIT + 1) == ExceptionTracker.MAX_TRACEBACK_LIMIT
+    assert (
+        tracker._normalize_limit(ExceptionTracker.MAX_TRACEBACK_LIMIT + 1)
+        == ExceptionTracker.MAX_TRACEBACK_LIMIT
+    )
     assert tracker._normalize_limit(0) == 0
     assert tracker._normalize_exception_params(((1, 2), {"mode": "test"})) == (
         (1, 2),
@@ -567,15 +601,21 @@ def test_normalize_helpers_accept_invalid_and_duplicate_inputs():
     assert tracker._normalize_exception_params(("bad", "shape")) == ((), {})
     assert tracker._normalize_mask_paths(None) == ()
     assert tracker._normalize_mask_paths("location.origin") == (("location", "origin"),)
-    assert tracker._normalize_mask_paths(("error", "message")) == (("error", "message"),)
+    assert tracker._normalize_mask_paths(("error", "message")) == (
+        ("error", "message"),
+    )
     assert tracker._normalize_mask_paths(123) == ()
-    assert tracker._normalize_mask_paths(["id", "id", ("error", "message"), (), 123]) == (
+    assert tracker._normalize_mask_paths(
+        ["id", "id", ("error", "message"), (), 123]
+    ) == (
         ("id",),
         ("error", "message"),
     )
     assert tracker._normalize_mask_presets(None) == ()
     assert tracker._normalize_mask_presets("private") == ("private",)
-    assert tracker._normalize_mask_presets(["private", "private", "unknown", 1]) == ("private",)
+    assert tracker._normalize_mask_presets(["private", "private", "unknown", 1]) == (
+        "private",
+    )
     assert tracker._normalize_mask_presets(123) == ()
     assert tracker._get_preset_mask_paths(("private", "traceback", "private")) == (
         ("input_context", "user_input"),
@@ -639,9 +679,27 @@ def test_copy_safe_context_keeps_small_values_and_blocks_heavy_values():
     assert copied["object"] == ExceptionTracker.BLOCKED_VALUE
     assert all(isinstance(copied_key, str) for copied_key in copied)
 
-    assert ExceptionTracker._copy_safe_context("x" * (ExceptionTracker.CONTEXT_MAX_VALUE_LENGTH + 1)) == ExceptionTracker.BLOCKED_VALUE
-    assert ExceptionTracker._copy_safe_context(list(range(ExceptionTracker.CONTEXT_MAX_ITEMS + 1))) == ExceptionTracker.BLOCKED_VALUE
-    assert ExceptionTracker._copy_safe_context({f"key_{index}": index for index in range(ExceptionTracker.CONTEXT_MAX_ITEMS + 1)}) == ExceptionTracker.BLOCKED_VALUE
+    assert (
+        ExceptionTracker._copy_safe_context(
+            "x" * (ExceptionTracker.CONTEXT_MAX_VALUE_LENGTH + 1)
+        )
+        == ExceptionTracker.BLOCKED_VALUE
+    )
+    assert (
+        ExceptionTracker._copy_safe_context(
+            list(range(ExceptionTracker.CONTEXT_MAX_ITEMS + 1))
+        )
+        == ExceptionTracker.BLOCKED_VALUE
+    )
+    assert (
+        ExceptionTracker._copy_safe_context(
+            {
+                f"key_{index}": index
+                for index in range(ExceptionTracker.CONTEXT_MAX_ITEMS + 1)
+            }
+        )
+        == ExceptionTracker.BLOCKED_VALUE
+    )
 
 
 def test_copy_safe_context_blocks_scalar_subclasses_without_retaining_identity():
@@ -719,7 +777,7 @@ def test_get_exception_info_handles_invalid_params_and_limits():
             mask_presets=("traceback", "system_info"),
             traceback_frame_limit=0,
             cause_limit=-1,
-    )
+        )
 
     info = result.data
     assert info["input_context"]["params"]["args"] == ()
@@ -742,7 +800,11 @@ def test_get_exception_info_extra_mask_paths_and_no_traceback_error():
     assert result.context == "<unknown>"
     assert result.data["quick_info"] == ExceptionTracker.MASKED_VALUE
     assert result.data["error"]["message"] == ExceptionTracker.MASKED_VALUE
-    assert result.data["location"]["origin"] == {"file": None, "line": None, "function": None}
+    assert result.data["location"]["origin"] == {
+        "file": None,
+        "line": None,
+        "function": None,
+    }
 
 
 def test_exception_causes_use_context_when_cause_is_absent():
@@ -783,7 +845,9 @@ def test_public_exception_info_normalizes_invalid_inputs_and_fallback(monkeypatc
         raise RuntimeError("builder broke")
 
     monkeypatch.setattr(ExceptionTracker, "_build_public_error_info", broken_builder)
-    fallback = tracker.get_public_exception_info(RuntimeError("boom"), public_context="Public.Context")
+    fallback = tracker.get_public_exception_info(
+        RuntimeError("boom"), public_context="Public.Context"
+    )
 
     assert fallback.context == "Public.Context"
     assert fallback.data["error"]["code"] == ExceptionTracker.DEFAULT_PUBLIC_ERROR_CODE
@@ -906,7 +970,10 @@ def test_public_exception_info_copies_bounded_json_safe_tags():
 
     bounded_result = tracker.get_public_exception_info(
         RuntimeError("internal"),
-        tags={f"key_{index}": index for index in range(ExceptionTracker.CONTEXT_MAX_ITEMS + 5)},
+        tags={
+            f"key_{index}": index
+            for index in range(ExceptionTracker.CONTEXT_MAX_ITEMS + 5)
+        },
     )
 
     assert len(bounded_result.data["tags"]) == ExceptionTracker.CONTEXT_MAX_ITEMS
@@ -958,7 +1025,10 @@ def test_get_error_code_returns_success_and_silent_missing_mapping_failure(capsy
     assert success_result.data == 1001
     assert failure_result.status is ResultStatus.FAILURE
     assert failure_result.data is None
-    assert failure_result.error == "Error type 'ZeroDivisionError' is not configured in error_id_map."
+    assert (
+        failure_result.error
+        == "Error type 'ZeroDivisionError' is not configured in error_id_map."
+    )
     assert failure_result.context == "Core.ExceptionTracker.get_error_code, L2"
     assert capsys.readouterr().out == ""
 

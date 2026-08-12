@@ -1,10 +1,10 @@
 [한국어 (Korean)](../../ko/guides/getting-started.md)
 
-> Runtime baseline: package version `1.0.0a0` (`tbot223_base.__version__ == "1.0.0a0"`).
+> Runtime baseline: package version `1.0.0a1` (`tbot223_base.__version__ == "1.0.0a1"`).
 
 # Getting Started
 
-This guide shows the smallest useful path for the rebuilding `1.0.0a0` alpha. It is not recommended for production use; see [Rebuilding](../rebuilding.md).
+This guide shows the smallest useful path for the rebuilding `1.0.0a1` alpha. It is not recommended for production use; see [Rebuilding](../rebuilding.md).
 
 ## Design Intent
 

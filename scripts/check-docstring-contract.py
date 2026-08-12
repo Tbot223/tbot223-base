@@ -8,7 +8,6 @@ import pathlib
 import sys
 from collections.abc import Iterable
 
-
 ROOT_DIR = pathlib.Path(__file__).resolve().parent.parent
 PUBLIC_METHODS = {
     "tbot223_base/result.py": {
@@ -52,7 +51,9 @@ CONTRACT_DOCS = (
 )
 
 
-def iter_methods(class_node: ast.ClassDef) -> Iterable[ast.FunctionDef | ast.AsyncFunctionDef]:
+def iter_methods(
+    class_node: ast.ClassDef,
+) -> Iterable[ast.FunctionDef | ast.AsyncFunctionDef]:
     for node in class_node.body:
         if isinstance(node, (ast.FunctionDef, ast.AsyncFunctionDef)):
             yield node
@@ -62,11 +63,11 @@ def validate_python_docstrings() -> list[str]:
     errors: list[str] = []
     for relative_path, classes in PUBLIC_METHODS.items():
         source_path = ROOT_DIR / relative_path
-        module = ast.parse(source_path.read_text(encoding="utf-8"), filename=str(source_path))
+        module = ast.parse(
+            source_path.read_text(encoding="utf-8"), filename=str(source_path)
+        )
         class_nodes = {
-            node.name: node
-            for node in module.body
-            if isinstance(node, ast.ClassDef)
+            node.name: node for node in module.body if isinstance(node, ast.ClassDef)
         }
 
         for class_name, method_names in classes.items():
@@ -103,7 +104,9 @@ def validate_contract_examples() -> list[str]:
         if "result = tracker.get_exception_info" not in document:
             errors.append(f"{relative_path}: missing get_exception_info example")
         if "print(result.success)  # False" not in document:
-            errors.append(f"{relative_path}: get_exception_info example must show failure")
+            errors.append(
+                f"{relative_path}: get_exception_info example must show failure"
+            )
     return errors
 
 

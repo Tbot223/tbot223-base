@@ -35,6 +35,8 @@ API에 민감한 변경은 다음을 실행하는 것이 좋다.
 ```bash
 pytest -q
 python -m mypy
+python -m ruff check .
+python -m ruff format --check .
 python scripts/check-docstring-contract.py
 markdownlint-cli2 "**/*.md" "#node_modules"
 python -m py_compile tbot223_base/__init__.py tbot223_base/result.py tbot223_base/exception_tracker.py
@@ -50,4 +52,4 @@ CI를 사용할 수 있으면 release-like checkpoint 전에 optional Python com
 - API 계약에 문서화하지 않은 alternate public import path를 추가하지 않는다.
 - Breaking change를 문서화하지 않고 `ResultStatus` string value를 바꾸지 않는다.
 - Payload behavior를 바꾸면서 동작 테스트 없이 문서만 갱신하지 않는다.
-- 현재 `1.0.0a0` rebuild 상태를 stable release나 production guarantee로 표현하지 않는다.
+- 현재 `1.0.0a1` rebuild 상태를 stable release나 production guarantee로 표현하지 않는다.

@@ -1,12 +1,12 @@
 [English](../en/README.md)
 
-> 런타임 기준: package version `1.0.0a0` (`tbot223_base.__version__ == "1.0.0a0"`).
+> 런타임 기준: package version `1.0.0a1` (`tbot223_base.__version__ == "1.0.0a1"`).
 
 # tbot223-base 문서
 
 `Result`, `ResultStatus`, `ExceptionTracker`를 사용하는 한국어 문서다.
 
-`1.0.0a0`는 재정비 중인 alpha이며 production 사용을 권장하지 않는다. [재정비 문서](rebuilding.md)부터 읽는다.
+`1.0.0a1`는 재정비 중인 alpha이며 production 사용을 권장하지 않는다. [재정비 문서](rebuilding.md)부터 읽는다.
 
 ## 시작하기
 

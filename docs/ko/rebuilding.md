@@ -1,10 +1,10 @@
 [English](../en/rebuilding.md)
 
-> 런타임 기준: package version `1.0.0a0` (`tbot223_base.__version__ == "1.0.0a0"`).
+> 런타임 기준: package version `1.0.0a1` (`tbot223_base.__version__ == "1.0.0a1"`).
 
 # `tbot223-base` 재정비
 
-`tbot223-base`는 `1.0.0a0`부터 다시 시작한다. 이전 공개 버전과 release tag는 패키지가 안정적인 타입·안전성 보장을 내세웠지만 런타임 구현이 이를 완전히 강제하지 못했기 때문에 철회했다.
+`tbot223-base`는 `1.0.0a1`에서 재정비 alpha를 이어간다. 이전 공개 버전과 release tag는 패키지가 안정적인 타입·안전성 보장을 내세웠지만 런타임 구현이 이를 완전히 강제하지 못했기 때문에 철회했다.
 
 ## 의미
 
@@ -32,9 +32,9 @@
 
 - Unit test, deterministic public docstring doctest, AST 기반 docstring-contract check가 통과한다.
 - Mypy가 지원하는 public usage는 통과시키고 의도적으로 잘못된 `Result` usage는 거부한다.
-- Markdownlint, actionlint, package build, `twine check`, isolated-wheel smoke check가 통과한다.
+- Ruff lint/format, Markdownlint, actionlint, package build, `twine check`, isolated-wheel smoke check가 통과한다.
 - Python 3.10부터 3.14 compatibility CI가 통과한다.
-- `v1.0.0a0` 같은 GitHub prerelease tag가 package version과 정확히 일치하고, 공개를 고려하기 전에 strict release readiness를 통과한다.
+- `v1.0.0a1` 같은 GitHub prerelease tag가 package version과 정확히 일치하고, 공개를 고려하기 전에 strict release readiness를 통과한다.
 
 ## 보류한 작업
 

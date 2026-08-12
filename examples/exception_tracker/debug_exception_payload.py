@@ -1,10 +1,10 @@
 #!/usr/bin/env python3
 """Build a masked debug exception payload."""
 
-from pathlib import Path
 import json
 import sys
 from collections.abc import Mapping
+from pathlib import Path
 from typing import cast
 
 sys.path.insert(0, str(Path(__file__).resolve().parents[2]))
@@ -42,9 +42,7 @@ def main() -> None:
             "location": payload.get("location"),
             "input_context": payload.get("input_context"),
             "traceback_frame_count": (
-                len(traceback_frames)
-                if isinstance(traceback_frames, list)
-                else 0
+                len(traceback_frames) if isinstance(traceback_frames, list) else 0
             ),
             "system_info": payload.get("system_info"),
         }

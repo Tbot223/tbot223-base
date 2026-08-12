@@ -12,8 +12,8 @@ and release tag/version consistency.
 
 Examples:
   scripts/check-release-readiness.sh
-  scripts/check-release-readiness.sh v1.0.0a0
-  scripts/check-release-readiness.sh --strict-release v1.0.0a0
+  scripts/check-release-readiness.sh v1.0.0a1
+  scripts/check-release-readiness.sh --strict-release v1.0.0a1
 USAGE
 }
 
@@ -55,7 +55,7 @@ require_command() {
 
   if ! command -v "${command_name}" >/dev/null 2>&1; then
     echo "Missing required command: ${command_name}" >&2
-    echo "Install local release tools with: python -m pip install -e \".[test,type,release]\"" >&2
+    echo "Install local release tools with: python -m pip install -e \".[test,type,lint,release]\"" >&2
     echo "For actionlint, use the Docker check or install the actionlint binary on the host." >&2
     echo "Docker check: docker compose run --build --rm check" >&2
     exit 1
@@ -75,7 +75,7 @@ if [[ -z "${RELEASE_TAG}" ]]; then
 fi
 
 if [[ ! "${RELEASE_TAG}" =~ ${RELEASE_TAG_REGEX} ]]; then
-  echo "Release tag must use stable vMAJOR.MINOR.PATCH, alpha vMAJOR.MINOR.PATCHaN, or release-candidate vMAJOR.MINOR.PATCHrcN format, for example v1.0.0a0." >&2
+  echo "Release tag must use stable vMAJOR.MINOR.PATCH, alpha vMAJOR.MINOR.PATCHaN, or release-candidate vMAJOR.MINOR.PATCHrcN format, for example v1.0.0a1." >&2
   exit 1
 fi
 
@@ -106,6 +106,7 @@ assert project["requires-python"] == ">=3.10"
 assert project["license"] == "Apache-2.0"
 assert project["license-files"] == ["LICENSE"]
 assert project["optional-dependencies"]["type"] == ["mypy>=1.15"]
+assert project["optional-dependencies"]["lint"] == ["ruff==0.16.2"]
 assert dynamic_version == "tbot223_base.__version__"
 
 print(f"metadata baseline ok: {project['name']} {__version__}")
@@ -151,6 +152,7 @@ fi
 require_command actionlint
 require_command npx
 require_command mypy
+require_command ruff
 
 echo "Checking Python syntax..."
 python -m py_compile \
@@ -167,6 +169,10 @@ python -m doctest tbot223_base/result.py tbot223_base/exception_tracker.py
 
 echo "Checking package typing..."
 mypy
+
+echo "Linting and formatting Python..."
+ruff check .
+ruff format --check .
 
 echo "Checking rejected Result API typing..."
 if mypy tests/typecheck/invalid_result_api.py; then

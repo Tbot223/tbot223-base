@@ -1,6 +1,6 @@
 [English](../../en/reference/exception-tracker.md)
 
-> 런타임 기준: package version `1.0.0a0` (`tbot223_base.__version__ == "1.0.0a0"`).
+> 런타임 기준: package version `1.0.0a1` (`tbot223_base.__version__ == "1.0.0a1"`).
 
 # ExceptionTracker 레퍼런스
 

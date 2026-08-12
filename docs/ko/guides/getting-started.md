@@ -1,10 +1,10 @@
 [English](../../en/guides/getting-started.md)
 
-> 런타임 기준: package version `1.0.0a0` (`tbot223_base.__version__ == "1.0.0a0"`).
+> 런타임 기준: package version `1.0.0a1` (`tbot223_base.__version__ == "1.0.0a1"`).
 
 # Getting Started
 
-이 가이드는 재정비 중인 `1.0.0a0` alpha의 가장 작은 사용 흐름을 보여준다. Production 사용을 권장하지 않으며 [재정비 문서](../rebuilding.md)를 먼저 읽는다.
+이 가이드는 재정비 중인 `1.0.0a1` alpha의 가장 작은 사용 흐름을 보여준다. Production 사용을 권장하지 않으며 [재정비 문서](../rebuilding.md)를 먼저 읽는다.
 
 ## 설계 의도
 

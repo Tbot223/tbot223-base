@@ -35,6 +35,8 @@ API-sensitive changes should run:
 ```bash
 pytest -q
 python -m mypy
+python -m ruff check .
+python -m ruff format --check .
 python scripts/check-docstring-contract.py
 markdownlint-cli2 "**/*.md" "#node_modules"
 python -m py_compile tbot223_base/__init__.py tbot223_base/result.py tbot223_base/exception_tracker.py
@@ -50,4 +52,4 @@ When CI is available, the optional Python compatibility workflow should be used 
 - Do not introduce alternate public import paths without documenting them in the API contract.
 - Do not change `ResultStatus` string values without documenting a breaking change.
 - Do not update docs without matching behavior tests when payload behavior changes.
-- Do not describe the `1.0.0a0` rebuild as a stable release or production guarantee.
+- Do not describe the `1.0.0a1` rebuild as a stable release or production guarantee.

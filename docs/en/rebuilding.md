@@ -1,10 +1,10 @@
 [한국어 (Korean)](../ko/rebuilding.md)
 
-> Runtime baseline: package version `1.0.0a0` (`tbot223_base.__version__ == "1.0.0a0"`).
+> Runtime baseline: package version `1.0.0a1` (`tbot223_base.__version__ == "1.0.0a1"`).
 
 # Rebuilding `tbot223-base`
 
-`tbot223-base` is restarting from `1.0.0a0`. Earlier public versions and release tags were withdrawn because the package presented stable type and safety guarantees that were not fully enforced by the runtime implementation.
+`tbot223-base` continues its rebuilding alpha at `1.0.0a1`. Earlier public versions and release tags were withdrawn because the package presented stable type and safety guarantees that were not fully enforced by the runtime implementation.
 
 ## What This Means
 
@@ -32,9 +32,9 @@
 
 - Unit tests, deterministic public docstring doctests, and the AST-based docstring-contract check pass.
 - Mypy accepts supported public usage and rejects intentionally invalid `Result` usage.
-- Markdownlint, actionlint, package build, `twine check`, and isolated-wheel smoke checks pass.
+- Ruff linting and formatting, Markdownlint, actionlint, package build, `twine check`, and isolated-wheel smoke checks pass.
 - Python 3.10 through 3.14 compatibility CI passes.
-- A GitHub prerelease tag such as `v1.0.0a0` exactly matches the package version and passes strict release readiness before any publication is considered.
+- A GitHub prerelease tag such as `v1.0.0a1` exactly matches the package version and passes strict release readiness before any publication is considered.
 
 ## Deferred Work
 

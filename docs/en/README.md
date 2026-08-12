@@ -1,12 +1,12 @@
 [한국어 (Korean)](../ko/README.md)
 
-> Runtime baseline: package version `1.0.0a0` (`tbot223_base.__version__ == "1.0.0a0"`).
+> Runtime baseline: package version `1.0.0a1` (`tbot223_base.__version__ == "1.0.0a1"`).
 
 # tbot223-base Docs
 
 English documentation for using `Result`, `ResultStatus`, and `ExceptionTracker`.
 
-`1.0.0a0` is a rebuilding alpha and is not recommended for production use. Start with [Rebuilding](rebuilding.md).
+`1.0.0a1` is a rebuilding alpha and is not recommended for production use. Start with [Rebuilding](rebuilding.md).
 
 ## Start Here
 

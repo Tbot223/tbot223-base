@@ -1,6 +1,6 @@
 [English](../../en/guides/package-and-ci.md)
 
-> 런타임 기준: package version `1.0.0a0` (`tbot223_base.__version__ == "1.0.0a0"`).
+> 런타임 기준: package version `1.0.0a1` (`tbot223_base.__version__ == "1.0.0a1"`).
 
 # Package and CI Guide
 
@@ -9,33 +9,35 @@
 ## 로컬 개발
 
 ```bash
-python -m pip install -e ".[test,type,release]"
+python -m pip install -e ".[test,type,lint,release]"
 npm ci
 pytest -q
 python -m mypy
+python -m ruff check .
+python -m ruff format --check .
 python scripts/check-docstring-contract.py
 npx --no-install markdownlint-cli2 "**/*.md" "#node_modules"
 ```
 
-Package에는 runtime dependency가 없다. `test`, `type`, `release` extra는 local verification용이다. Markdownlint는 development-only이며 Python package에 포함되지 않는다.
+Package에는 runtime dependency가 없다. `test`, `type`, `lint`, `release` extra는 local verification용이다. Ruff와 Markdownlint는 development-only이며 Python package에 포함되지 않는다.
 
 ## Release readiness
 
 정확한 alpha tag text로 complete local gate를 실행한다.
 
 ```bash
-scripts/check-release-readiness.sh v1.0.0a0
+scripts/check-release-readiness.sh v1.0.0a1
 ```
 
 Strict mode는 tag가 `HEAD`를 가리키고 worktree가 clean하며 local `origin/main`을 확인할 수 있어야 한다.
 
 ```bash
-scripts/check-release-readiness.sh --strict-release v1.0.0a0
+scripts/check-release-readiness.sh --strict-release v1.0.0a1
 ```
 
 허용 tag는 stable `vMAJOR.MINOR.PATCH`, alpha `vMAJOR.MINOR.PATCHaN`, release-candidate `vMAJOR.MINOR.PATCHrcN`이다. 앞의 `v`를 뺀 문자열은 `tbot223_base.__version__`과 정확히 같아야 한다.
 
-Script는 Python compile check, pytest와 deterministic docstring doctest, AST docstring-contract validation, positive/negative mypy check, Markdownlint, actionlint, diff whitespace check, source/wheel build, `twine check`, distribution inspection, isolated-wheel smoke test를 실행한다.
+Script는 Python compile check, pytest와 deterministic docstring doctest, AST docstring-contract validation, positive/negative mypy check, Ruff lint/format check, Markdownlint, actionlint, diff whitespace check, source/wheel build, `twine check`, distribution inspection, isolated-wheel smoke test를 실행한다.
 
 ## Docker check
 
@@ -44,14 +46,14 @@ docker compose run --build --rm test
 docker compose run --build --rm check
 ```
 
-`check` image는 `actionlint`와 development-only Markdownlint CLI를 설치하고 완전한 `v1.0.0a0` readiness check를 실행한다.
+`check` image는 `actionlint`, Ruff, development-only Markdownlint CLI를 설치하고 완전한 `v1.0.0a1` readiness check를 실행한다.
 
 ## Compatibility CI
 
-`.github/workflows/python-compatibility.yml`은 Python 3.10부터 3.14에서 push, pull request, manual dispatch, reusable-workflow invocation마다 실행한다. Pytest, public consumer typing, 의도적으로 잘못된 `Result` type fixture, docstring contract, Markdownlint를 검증한다.
+`.github/workflows/python-compatibility.yml`은 Python 3.10부터 3.14에서 push, pull request, manual dispatch, reusable-workflow invocation마다 실행한다. Pytest, public consumer typing, 의도적으로 잘못된 `Result` type fixture, Ruff lint/format, docstring contract, Markdownlint를 검증한다.
 
 ## Publish workflow
 
 `.github/workflows/publish.yml`은 GitHub Release가 published일 때만 시작한다. Version과 일치하는 `main` tag, compatibility workflow, build/wheel check, PyPI Trusted Publishing을 요구한다.
 
-Alpha와 release-candidate tag는 GitHub prerelease option을 켜야 한다. Stable tag는 끄고 publish한다. `1.0.0a0`는 재정비 alpha이므로 프로젝트가 명시적으로 승인하기 전에는 release를 만들거나 distribution을 publish하지 않는다.
+Alpha와 release-candidate tag는 GitHub prerelease option을 켜야 한다. Stable tag는 끄고 publish한다. `1.0.0a1`은 재정비 alpha이므로 프로젝트가 명시적으로 승인하기 전에는 release를 만들거나 distribution을 publish하지 않는다.

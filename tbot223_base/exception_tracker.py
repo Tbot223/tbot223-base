@@ -12,12 +12,31 @@ from collections.abc import Iterable, Mapping
 from copy import deepcopy
 from functools import wraps
 from types import MappingProxyType
-from typing import Any, Awaitable, Callable, Dict, List, Literal, Optional, ParamSpec, Tuple, TypeAlias, TypeGuard, TypeVar, TypedDict, Union, cast, overload
+from typing import (
+    Any,
+    Awaitable,
+    Callable,
+    Dict,
+    List,
+    Literal,
+    Optional,
+    ParamSpec,
+    Tuple,
+    TypeAlias,
+    TypedDict,
+    TypeGuard,
+    TypeVar,
+    Union,
+    cast,
+    overload,
+)
 
 # internal modules
 from tbot223_base.result import Result, ResultStatus
 
-MaskPreset: TypeAlias = Literal["default", "private", "user_input", "params", "traceback", "system_info"]
+MaskPreset: TypeAlias = Literal[
+    "default", "private", "user_input", "params", "traceback", "system_info"
+]
 MaskPath: TypeAlias = Union[str, Tuple[str, ...]]
 MaskPresetsInput: TypeAlias = Optional[Union[MaskPreset, Iterable[MaskPreset]]]
 MaskPathsInput: TypeAlias = Optional[Union[MaskPath, Iterable[MaskPath]]]
@@ -60,12 +79,13 @@ _PayloadT = TypeVar("_PayloadT")
 class ExceptionTrackerHelper:
     """
     Helper functions for `ExceptionTracker` to build structured exception information.
-    
+
     ### Note
     > - Focuses on constructing detailed error information payloads.
     > - Used internally by `ExceptionTracker` for consistent data formatting.
     > - Not intended for direct use by external code.
     """
+
     ENVIRONMENT_VARIABLE_MAX_VALUE_LENGTH = 200
     ENVIRONMENT_VARIABLE_MAX_COUNT = 50
 
@@ -74,7 +94,10 @@ class ExceptionTrackerHelper:
         """Return whether a value is a small primitive safe to copy."""
         if value is None or isinstance(value, (bool, int, float)):
             return True, value
-        if isinstance(value, str) and len(value) <= cls.ENVIRONMENT_VARIABLE_MAX_VALUE_LENGTH:
+        if (
+            isinstance(value, str)
+            and len(value) <= cls.ENVIRONMENT_VARIABLE_MAX_VALUE_LENGTH
+        ):
             return True, value
         return False, None
 
@@ -113,7 +136,10 @@ class ExceptionTrackerHelper:
         environment_items = list(environment.items())
 
         for key, value in environment_items:
-            if not isinstance(key, str) or len(key) > cls.ENVIRONMENT_VARIABLE_MAX_VALUE_LENGTH:
+            if (
+                not isinstance(key, str)
+                or len(key) > cls.ENVIRONMENT_VARIABLE_MAX_VALUE_LENGTH
+            ):
                 continue
             is_small, copied_value = cls._copy_small_environment_value(value)
             if not is_small:
@@ -170,7 +196,6 @@ class ExceptionTrackerHelper:
             "Hostname": platform.node(),
             "PID": os.getpid(),
             "Thread_Name": threading.current_thread().name,
-
             "Command_Args": list(sys.argv),
             "Virtual_Env": (
                 environment_variables["VIRTUAL_ENV"]
@@ -179,10 +204,9 @@ class ExceptionTrackerHelper:
             ),
             "Environment_Variables": environment_variables,
             "Python_Path": list(sys.path),
-
-            "Timestamp": time.strftime("%Y-%m-%dT%H:%M:%SZ", time.gmtime())
+            "Timestamp": time.strftime("%Y-%m-%dT%H:%M:%SZ", time.gmtime()),
         }
-    
+
     @staticmethod
     def get_error_info_structure():
         """
@@ -207,44 +231,24 @@ class ExceptionTrackerHelper:
             "success": None,
             "timestamp": None,
             "quick_info": None,
-
             "error": {
                 "type": None,
                 "message": None,
             },
             "location": {
-                "entry": {
-                    "file": None,
-                    "line": None,
-                    "function": None
-                },
-                "origin": {
-                    "file": None,
-                    "line": None,
-                    "function": None
-                }
+                "entry": {"file": None, "line": None, "function": None},
+                "origin": {"file": None, "line": None, "function": None},
             },
-
             "tags": {},
-
             "input_context": {
                 "user_input": None,
-                "params": {
-                    "args": None,
-                    "kwargs": None
-                },
-                "local_variables": {}
+                "params": {"args": None, "kwargs": None},
+                "local_variables": {},
             },
-
             "causes": [],
-
             "traceback": None,
             "traceback_frames": [],
-
-            "system_info": {
-                "started_at": None,
-                "now": None
-            }
+            "system_info": {"started_at": None, "now": None},
         }
 
     @staticmethod
@@ -275,14 +279,14 @@ class ExceptionTrackerHelper:
                 "message": None,
             },
             "tags": {},
-            "retryable": None
+            "retryable": None,
         }
 
 
 class ExceptionTracker:
     """
     Collect structured exception information and return it in `Result` format.
-    
+
     ### Note
     > - Locates where an exception occurred.
     > - Builds a detailed error information payload.
@@ -301,17 +305,13 @@ class ExceptionTracker:
     PUBLIC_TAG_MAX_DEPTH = 3
     MASK_PRESETS: Mapping[MaskPreset, Tuple[Tuple[str, ...], ...]] = MappingProxyType(
         {
-            "default": (
-                ("input_context", "local_variables"),
-            ),
+            "default": (("input_context", "local_variables"),),
             "private": (
                 ("input_context", "user_input"),
                 ("input_context", "params"),
                 ("input_context", "local_variables"),
             ),
-            "user_input": (
-                ("input_context", "user_input"),
-            ),
+            "user_input": (("input_context", "user_input"),),
             "params": (
                 ("input_context", "params"),
                 ("input_context", "local_variables"),
@@ -321,9 +321,7 @@ class ExceptionTracker:
                 ("traceback",),
                 ("traceback_frames",),
             ),
-            "system_info": (
-                ("system_info",),
-            ),
+            "system_info": (("system_info",),),
         }
     )
 
@@ -351,7 +349,9 @@ class ExceptionTracker:
     def _format_location(location: Mapping[str, object]) -> str:
         if not location.get("file"):
             return "<unknown>"
-        return f"'{location['file']}', line {location['line']}, in {location['function']}"
+        return (
+            f"'{location['file']}', line {location['line']}, in {location['function']}"
+        )
 
     @staticmethod
     def _normalize_public_context(public_context: object) -> Optional[str]:
@@ -379,7 +379,9 @@ class ExceptionTracker:
         return f"{type(error).__name__}: {ExceptionTracker._safe_exception_text(error)}"
 
     @staticmethod
-    def _copy_system_info_snapshot(system_info: Mapping[str, object]) -> Dict[str, object]:
+    def _copy_system_info_snapshot(
+        system_info: Mapping[str, object],
+    ) -> Dict[str, object]:
         """Return an isolated system information snapshot copy."""
         return cast(Dict[str, object], deepcopy(dict(system_info)))
 
@@ -419,7 +421,11 @@ class ExceptionTracker:
         if type(value) is float:
             return value if math.isfinite(cast(float, value)) else cls.BLOCKED_VALUE
         if type(value) is str:
-            return value if len(cast(str, value)) <= cls.CONTEXT_MAX_VALUE_LENGTH else cls.BLOCKED_VALUE
+            return (
+                value
+                if len(cast(str, value)) <= cls.CONTEXT_MAX_VALUE_LENGTH
+                else cls.BLOCKED_VALUE
+            )
 
         if depth >= cls.PUBLIC_TAG_MAX_DEPTH:
             return cls.BLOCKED_VALUE
@@ -500,8 +506,12 @@ class ExceptionTracker:
     @staticmethod
     def _build_handler_failure_payload(error: Exception) -> Tuple[str, str]:
         """Build fallback error text when exception tracking itself fails."""
-        print("An error occurred while handling another exception. This may indicate a critical issue.")
-        traceback_text = "".join(traceback.format_exception(type(error), error, error.__traceback__))
+        print(
+            "An error occurred while handling another exception. This may indicate a critical issue."
+        )
+        traceback_text = "".join(
+            traceback.format_exception(type(error), error, error.__traceback__)
+        )
         return ExceptionTracker._format_exception_message(error), traceback_text
 
     @classmethod
@@ -578,16 +588,8 @@ class ExceptionTracker:
     @staticmethod
     def _frame_to_location(frame) -> dict:
         if frame is None:
-            return {
-                "file": None,
-                "line": None,
-                "function": None
-            }
-        return {
-            "file": frame.filename,
-            "line": frame.lineno,
-            "function": frame.name
-        }
+            return {"file": None, "line": None, "function": None}
+        return {"file": frame.filename, "line": frame.lineno, "function": frame.name}
 
     @classmethod
     def _frame_to_traceback_frame(cls, frame) -> dict:
@@ -714,7 +716,9 @@ class ExceptionTracker:
         return isinstance(path, tuple) and all(isinstance(part, str) for part in path)
 
     @staticmethod
-    def _dedupe_mask_paths(paths: Tuple[Tuple[str, ...], ...]) -> Tuple[Tuple[str, ...], ...]:
+    def _dedupe_mask_paths(
+        paths: Tuple[Tuple[str, ...], ...],
+    ) -> Tuple[Tuple[str, ...], ...]:
         """Return mask paths with duplicates removed while preserving order."""
         deduped_paths: List[Tuple[str, ...]] = []
         seen_paths = set()
@@ -728,7 +732,9 @@ class ExceptionTracker:
         return tuple(deduped_paths)
 
     @classmethod
-    def _normalize_mask_paths(cls, paths: MaskPathsInput) -> Tuple[Tuple[str, ...], ...]:
+    def _normalize_mask_paths(
+        cls, paths: MaskPathsInput
+    ) -> Tuple[Tuple[str, ...], ...]:
         """
         Normalize mask path input into internal tuple-path form.
 
@@ -769,7 +775,9 @@ class ExceptionTracker:
         return cls._dedupe_mask_paths(tuple(normalized_paths))
 
     @classmethod
-    def _normalize_mask_presets(cls, presets: MaskPresetsInput) -> Tuple[MaskPreset, ...]:
+    def _normalize_mask_presets(
+        cls, presets: MaskPresetsInput
+    ) -> Tuple[MaskPreset, ...]:
         """
         Normalize mask preset input into known preset names.
 
@@ -808,7 +816,9 @@ class ExceptionTracker:
         return tuple(normalized_presets)
 
     @classmethod
-    def _get_preset_mask_paths(cls, presets: MaskPresetsInput) -> Tuple[Tuple[str, ...], ...]:
+    def _get_preset_mask_paths(
+        cls, presets: MaskPresetsInput
+    ) -> Tuple[Tuple[str, ...], ...]:
         """
         Return mask paths selected by named presets.
 
@@ -861,7 +871,9 @@ class ExceptionTracker:
         for path in paths:
             cls._mask_path(error_info, path)
 
-    def _get_exception_causes(self, error: Exception, limit: int) -> List[Dict[str, object]]:
+    def _get_exception_causes(
+        self, error: Exception, limit: int
+    ) -> List[Dict[str, object]]:
         causes: List[Dict[str, object]] = []
         seen = set()
         current_error = error.__cause__ or error.__context__
@@ -873,11 +885,13 @@ class ExceptionTracker:
 
             tb = traceback.extract_tb(current_error.__traceback__)
             origin_frame = tb[-1] if tb else None
-            causes.append({
-                "type": type(current_error).__name__,
-                "message": self._safe_exception_text(current_error),
-                "location": self._frame_to_location(origin_frame)
-            })
+            causes.append(
+                {
+                    "type": type(current_error).__name__,
+                    "message": self._safe_exception_text(current_error),
+                    "location": self._frame_to_location(origin_frame),
+                }
+            )
 
             current_error = current_error.__cause__ or current_error.__context__
 
@@ -898,7 +912,9 @@ class ExceptionTracker:
         entry_frame = traceback_summary[0] if traceback_summary else None
         origin_frame = traceback_summary[-1] if traceback_summary else None
         origin_location = self._frame_to_location(origin_frame)
-        limited_frames = traceback_summary[-traceback_frame_limit:] if traceback_frame_limit else []
+        limited_frames = (
+            traceback_summary[-traceback_frame_limit:] if traceback_frame_limit else []
+        )
         args, kwargs = self._normalize_exception_params(params)
 
         error_info = ExceptionTrackerHelper.get_error_info_structure()
@@ -910,7 +926,9 @@ class ExceptionTracker:
         error_info["location"]["origin"] = origin_location
         error_info["input_context"]["user_input"] = self._copy_safe_context(user_input)
         error_info["input_context"]["params"]["args"] = self._copy_safe_context(args)
-        error_info["input_context"]["params"]["kwargs"] = self._copy_safe_context(kwargs)
+        error_info["input_context"]["params"]["kwargs"] = self._copy_safe_context(
+            kwargs
+        )
         error_info["input_context"]["local_variables"] = self._copy_safe_context(
             self._get_local_variables(error)
         )
@@ -919,8 +937,7 @@ class ExceptionTracker:
             traceback.format_exception(type(error), error, error.__traceback__)
         )
         error_info["traceback_frames"] = [
-            self._frame_to_traceback_frame(frame)
-            for frame in limited_frames
+            self._frame_to_traceback_frame(frame) for frame in limited_frames
         ]
         startup_system_info = self._get_startup_system_info()
         error_info["system_info"]["started_at"] = self._copy_system_info_snapshot(
@@ -1142,11 +1159,17 @@ class ExceptionTracker:
                 tags=tags,
                 retryable=retryable,
             )
-            return self._build_public_exception_result(public_error_info, public_context)
+            return self._build_public_exception_result(
+                public_error_info, public_context
+            )
         except Exception:
-            print("An error occurred while building public exception information. Falling back to a safe generic payload.")
+            print(
+                "An error occurred while building public exception information. Falling back to a safe generic payload."
+            )
             fallback_error_info = self._build_public_fallback_error_info()
-            return self._build_public_exception_result(fallback_error_info, public_context)
+            return self._build_public_exception_result(
+                fallback_error_info, public_context
+            )
 
     # L2 Methods
     def get_exception_return(
@@ -1271,7 +1294,9 @@ class ExceptionTracker:
             retryable=retryable,
         )
 
-    def get_error_code(self, error_id_map: Mapping[str, object], error: Exception) -> Result[object]:
+    def get_error_code(
+        self, error_id_map: Mapping[str, object], error: Exception
+    ) -> Result[object]:
         """
         Return a user-defined error code for a given exception type.
 
@@ -1369,6 +1394,7 @@ class ExceptionTrackerDecorator:
     >>> result.is_failure
     True
     """
+
     def __init__(
         self,
         mask_presets: MaskPresetsInput = ExceptionTracker.DEFAULT_MASK_PRESETS,
@@ -1396,12 +1422,12 @@ class ExceptionTrackerDecorator:
     def __call__(
         self,
         func: Callable[P, Awaitable[R]],
-    ) -> Callable[P, Awaitable[Union[R, Result[object]]]]:
-        ...
+    ) -> Callable[P, Awaitable[Union[R, Result[object]]]]: ...
 
     @overload
-    def __call__(self, func: Callable[P, R]) -> Callable[P, Union[R, Result[object]]]:
-        ...
+    def __call__(
+        self, func: Callable[P, R]
+    ) -> Callable[P, Union[R, Result[object]]]: ...
 
     def __call__(self, func: Callable[P, Any]) -> Callable[P, Any]:
         if inspect.iscoroutinefunction(func):
@@ -1414,7 +1440,10 @@ class ExceptionTrackerDecorator:
                 except Exception as e:
                     return self.tracker.get_exception_return(
                         error=e,
-                        params=(cast(Tuple[object, ...], args), cast(Mapping[str, object], kwargs)),
+                        params=(
+                            cast(Tuple[object, ...], args),
+                            cast(Mapping[str, object], kwargs),
+                        ),
                         mask_presets=self.mask_presets,
                         mask_paths=self.mask_paths,
                     )
@@ -1429,7 +1458,10 @@ class ExceptionTrackerDecorator:
                 # Use the tracker to get standardized exception return
                 return self.tracker.get_exception_return(
                     error=e,
-                    params=(cast(Tuple[object, ...], args), cast(Mapping[str, object], kwargs)),
+                    params=(
+                        cast(Tuple[object, ...], args),
+                        cast(Mapping[str, object], kwargs),
+                    ),
                     mask_presets=self.mask_presets,
                     mask_paths=self.mask_paths,
                 )
@@ -1442,11 +1474,15 @@ class ExceptionTrackerDecorator:
                     except Exception as e:
                         return self.tracker.get_exception_return(
                             error=e,
-                            params=(cast(Tuple[object, ...], args), cast(Mapping[str, object], kwargs)),
+                            params=(
+                                cast(Tuple[object, ...], args),
+                                cast(Mapping[str, object], kwargs),
+                            ),
                             mask_presets=self.mask_presets,
                             mask_paths=self.mask_paths,
                         )
 
                 return await_result()
             return result
+
         return wrapper

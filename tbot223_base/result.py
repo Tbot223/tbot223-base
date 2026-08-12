@@ -3,7 +3,6 @@
 from enum import Enum
 from typing import ClassVar, Generic, Literal, Optional, TypeVar, Union, cast, overload
 
-
 _RESULT_SENTINEL = object()
 _DataT = TypeVar("_DataT")
 _DefaultT = TypeVar("_DefaultT")
@@ -53,7 +52,9 @@ class ResultStatus(str, Enum):
 class ResultUnwrapException(RuntimeError):
     """Represent an attempt to unwrap a non-success `Result`."""
 
-    def __init__(self, error: Optional[str], context: Optional[str], data: object) -> None:
+    def __init__(
+        self, error: Optional[str], context: Optional[str], data: object
+    ) -> None:
         """
         Initialize an unwrap failure without formatting stored result values.
 
@@ -113,7 +114,12 @@ class Result(tuple, Generic[_DataT]):
     """
 
     __slots__ = ()
-    _fields: ClassVar[tuple[str, str, str, str]] = ("status", "error", "context", "data")
+    _fields: ClassVar[tuple[str, str, str, str]] = (
+        "status",
+        "error",
+        "context",
+        "data",
+    )
     __match_args__: ClassVar[
         tuple[Literal["status"], Literal["error"], Literal["context"], Literal["data"]]
     ] = ("status", "error", "context", "data")
@@ -126,8 +132,7 @@ class Result(tuple, Generic[_DataT]):
         context: Optional[str],
         data: _DataT,
         /,
-    ) -> "Result[_DataT]":
-        ...
+    ) -> "Result[_DataT]": ...
 
     @overload
     def __new__(
@@ -137,8 +142,7 @@ class Result(tuple, Generic[_DataT]):
         data: _DataT,
         error: Optional[str] = ...,
         context: Optional[str] = ...,
-    ) -> "Result[_DataT]":
-        ...
+    ) -> "Result[_DataT]": ...
 
     @overload
     def __new__(
@@ -148,8 +152,7 @@ class Result(tuple, Generic[_DataT]):
         data: _DataT,
         error: Optional[str] = ...,
         context: Optional[str] = ...,
-    ) -> "Result[_DataT]":
-        ...
+    ) -> "Result[_DataT]": ...
 
     def __new__(
         cls: type["Result[_DataT]"],

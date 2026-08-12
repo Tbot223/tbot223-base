@@ -1,8 +1,8 @@
 #!/usr/bin/env python3
 """Run a small `Result` status flow example."""
 
-from pathlib import Path
 import sys
+from pathlib import Path
 
 sys.path.insert(0, str(Path(__file__).resolve().parents[2]))
 
@@ -36,7 +36,11 @@ def main() -> None:
     cancelled_result = maybe_skip_profile_load(enabled=False)
 
     print("success:", success_result.status.value, success_result.unwrap())
-    print("failure:", failure_result.status.value, failure_result.unwrap_or({"fallback": True}))
+    print(
+        "failure:",
+        failure_result.status.value,
+        failure_result.unwrap_or({"fallback": True}),
+    )
     print("cancelled:", cancelled_result.status.value, cancelled_result.success)
 
     try:

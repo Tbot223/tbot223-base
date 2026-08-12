@@ -50,8 +50,12 @@ test = [
 type = [
     "mypy>=1.15",
 ]
+lint = [
+    "ruff==0.16.2",
+]
 release = [
     "build>=1",
+    "ruff==0.16.2",
     "setuptools>=77",
     "tomli>=2; python_version < '3.11'",
     "twine>=5",
@@ -61,6 +65,7 @@ dev = [
     "build>=1",
     "mypy>=1.15",
     "pytest>=8",
+    "ruff==0.16.2",
     "setuptools>=77",
     "tomli>=2; python_version < '3.11'",
     "twine>=5",
@@ -86,3 +91,9 @@ show_error_codes = true
 warn_unused_configs = true
 warn_unused_ignores = true
 exclude = ["^tests/typecheck/invalid_result_api\\.py$"]
+
+[tool.ruff]
+target-version = "py310"
+
+[tool.ruff.lint]
+select = ["E4", "E7", "E9", "F", "I"]

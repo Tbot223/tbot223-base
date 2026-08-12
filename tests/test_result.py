@@ -58,7 +58,12 @@ def test_result_factories_build_explicit_statuses_with_required_payloads():
     assert success == (ResultStatus.SUCCESS, None, "SuccessCase", {"value": 1})
     assert failure == (ResultStatus.FAILURE, "boom", "FailureCase", None)
     assert cancelled == (ResultStatus.CANCELLED, None, "CancelledCase", None)
-    assert tuple(success) == (success.status, success.error, success.context, success.data)
+    assert tuple(success) == (
+        success.status,
+        success.error,
+        success.context,
+        success.data,
+    )
 
 
 def test_result_retains_tuple_like_behavior_without_raw_reconstruction_helpers():

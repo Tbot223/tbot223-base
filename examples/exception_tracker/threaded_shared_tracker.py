@@ -1,10 +1,10 @@
 #!/usr/bin/env python3
 """Share one `ExceptionTracker` across thread workers."""
 
+import sys
 from collections.abc import Mapping
 from concurrent.futures import ThreadPoolExecutor
 from pathlib import Path
-import sys
 from typing import cast
 
 sys.path.insert(0, str(Path(__file__).resolve().parents[2]))
@@ -35,7 +35,9 @@ def main() -> None:
     tracker = ExceptionTracker()
 
     with ThreadPoolExecutor(max_workers=4) as executor:
-        payloads = list(executor.map(lambda task_id: run_task(tracker, task_id), range(4)))
+        payloads = list(
+            executor.map(lambda task_id: run_task(tracker, task_id), range(4))
+        )
 
     for payload in payloads:
         error_info = cast(Mapping[str, object], payload["error"])

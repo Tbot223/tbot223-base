@@ -28,10 +28,10 @@ jobs:
           python-version: ${{ matrix.python-version }}
           cache: pip
 
-      - name: Install package with test and type dependencies
+      - name: Install package with test, type, and lint dependencies
         run: |
           python -m pip install --upgrade pip
-          python -m pip install -e ".[test,type]"
+          python -m pip install -e ".[test,type,lint]"
 
       - name: Set up Markdown linting
         uses: actions/setup-node@v6
@@ -46,6 +46,11 @@ jobs:
 
       - name: Check package typing
         run: python -m mypy
+
+      - name: Lint and format Python
+        run: |
+          python -m ruff check .
+          python -m ruff format --check .
 
       - name: Check rejected Result API typing
         run: |

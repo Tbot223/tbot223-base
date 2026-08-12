@@ -1,7 +1,6 @@
-from typing import Awaitable, TYPE_CHECKING, Union
+from typing import TYPE_CHECKING, Awaitable, Union
 
 from tbot223_base import ExceptionTrackerDecorator, Result
-
 
 decorator = ExceptionTrackerDecorator()
 

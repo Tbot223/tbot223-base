@@ -2,6 +2,20 @@
 
 # 릴리스 노트
 
+## 1.0.0a1 — lint 기준
+
+`1.0.0a1`은 `1.0.0a0` 이후 재정비 alpha를 이어간다. 새 runtime API나 stable compatibility 보장을 추가하지 않는다.
+
+### 추가
+
+- 저장소가 Python 3.10 기준의 Ruff 설정과 baseline correctness/import sorting 규칙(`E4`, `E7`, `E9`, `F`, `I`)을 직접 관리한다.
+- Ruff는 development-only `lint` extra로 제공하고 compatibility CI, Docker check, release readiness에서 실행한다.
+
+### 변경
+
+- Package code, test, example, helper script의 import ordering과 Ruff formatter 출력을 같은 기준으로 맞췄다.
+- Developer/release 문서에 Ruff lint와 format check를 추가했다.
+
 ## 1.0.0a0 — 재정비
 
 `1.0.0a0`는 패키지를 alpha 재정비로 다시 시작한다. 이전 공개 릴리스와 tag는 철회했으며, 이 문서는 그것들을 유효한 릴리스 이력으로 보존하지 않는다. 이유와 현재 범위는 [재정비 문서](rebuilding.md)를 참고한다.
@@ -23,7 +37,7 @@
 
 - Public docstring은 구조 검사와 deterministic doctest로 검증한다.
 - Type gate는 유효한 `Result` 생성을 통과시키고 data 생략, 잘못된 payload type, 제거된 raw helper 사용을 거부한다.
-- CI는 Python 3.10–3.14를 대상으로 pytest, mypy, Markdownlint, actionlint, package check를 실행한다.
+- CI는 Python 3.10–3.14를 대상으로 pytest, mypy, Ruff lint/format, Markdownlint, actionlint, package check를 실행한다.
 - release-ready package는 sdist/wheel build, `twine check`, isolated wheel smoke test를 통과했다.
 
 ### 보류한 작업

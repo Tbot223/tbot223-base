@@ -1,9 +1,9 @@
 #!/usr/bin/env python3
 """Build a public-safe exception payload."""
 
-from pathlib import Path
 import json
 import sys
+from pathlib import Path
 
 sys.path.insert(0, str(Path(__file__).resolve().parents[2]))
 
