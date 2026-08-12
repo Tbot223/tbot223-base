@@ -1,10 +1,10 @@
 [English](../../en/guides/getting-started.md)
 
-> 런타임 기준: package version 1.0.0 (`tbot223_base.__version__ == "1.0.0"`).
+> 런타임 기준: package version `1.0.0a0` (`tbot223_base.__version__ == "1.0.0a0"`).
 
 # Getting Started
 
-이 가이드는 repository checkout 또는 editable install 상태에서 `tbot223-base`를 import해 쓰는 가장 작은 흐름을 보여준다.
+이 가이드는 재정비 중인 `1.0.0a0` alpha의 가장 작은 사용 흐름을 보여준다. Production 사용을 권장하지 않으며 [재정비 문서](../rebuilding.md)를 먼저 읽는다.
 
 ## 설계 의도
 
@@ -30,20 +30,15 @@
 ## Result 기본 사용
 
 ```python
-from tbot223_base.result import Result, ResultStatus
+from tbot223_base.result import Result
 
-result: Result[dict[str, str]] = Result(
-    status=ResultStatus.SUCCESS,
-    error=None,
-    context="LoadConfig",
-    data={"mode": "dev"},
-)
+result: Result[dict[str, str]] = Result.ok({"mode": "dev"}, context="LoadConfig")
 
 if result.is_success:
     print(result.unwrap())
 ```
 
-명시적인 status 처리가 필요하면 `ResultStatus.SUCCESS`, `ResultStatus.FAILURE`, `ResultStatus.CANCELLED`를 사용한다. `success=` 생성자 인자는 tri-state shorthand로도 지원된다.
+새 코드에서는 `Result.ok()`, `Result.failure()`, `Result.cancelled()`를 사용한다. 의도적인 `None`을 포함해 모든 result는 명시적 `data`가 필요하고 `ResultStatus`가 필요한 경우에는 direct construction도 사용할 수 있다.
 
 ## Public 예외 payload
 

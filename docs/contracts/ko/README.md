@@ -1,6 +1,6 @@
 [English](../en/README.md)
 
-> Contract revision: 2026-06-23.
+> Contract revision: 2026-08-12.
 
 # Contract Docs
 

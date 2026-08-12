@@ -1,6 +1,6 @@
 [English](../../en/reference/exception-tracker.md)
 
-> 런타임 기준: package version 1.0.0 (`tbot223_base.__version__ == "1.0.0"`).
+> 런타임 기준: package version `1.0.0a0` (`tbot223_base.__version__ == "1.0.0a0"`).
 
 # ExceptionTracker 레퍼런스
 
@@ -15,7 +15,7 @@ Debug/public payload shape의 안정성 규칙은 [API 계약](../../contracts/k
 | Debug-heavy | `get_exception_info()`, `get_exception_return()` | traceback과 context metadata가 필요한 내부 진단. |
 | Public-safe | `get_public_exception_info()`, `get_public_exception_return()` | API 응답, UI, untrusted boundary. |
 
-Public-safe 경로는 traceback text, local variables, params, system information을 수집하지 않는다.
+Public-safe 경로는 traceback text, local variables, params, system information을 수집하지 않는다. Tracker를 생성하거나 `get_exception_location()`을 호출해도 deferred system snapshot은 수집하지 않는다.
 
 ## Public tag safety
 
@@ -43,7 +43,7 @@ Debug 경로는 `user_input`, `params.args`, `params.kwargs`, origin frame의 `l
 
 ## System info
 
-Debug payload는 내부 진단용 system information을 포함한다. 환경변수는 key가 작은 문자열이고 value가 작은 primitive 또는 작은 primitive만 담은 얕은 tuple/list일 때만 복사하며, `ENVIRONMENT_VARIABLE_MAX_COUNT`개에서 수집을 멈춘다. 작은 환경변수 값도 민감할 수 있으므로 trusted boundary 밖으로 debug payload를 보낼 때는 `system_info`를 mask해야 한다.
+Debug payload는 첫 debug-heavy 호출에서 system snapshot 하나를 lazy 수집하고 이후 각 payload에 복사한다. `started_at`과 `now` 모두 추가 system collection을 일으키지 않는다. 환경변수는 key가 작은 문자열이고 value가 작은 primitive 또는 작은 primitive만 담은 얕은 tuple/list일 때만 복사하며, `ENVIRONMENT_VARIABLE_MAX_COUNT`개에서 수집을 멈춘다. 작은 환경변수 값도 민감할 수 있으므로 trusted boundary 밖으로 debug payload를 보낼 때는 `system_info`를 mask해야 한다.
 
 ## Thread concurrency
 

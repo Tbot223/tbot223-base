@@ -65,7 +65,7 @@ Runtime truth takes priority over format. When evidence is insufficient, do not 
 - `Constraint` reflects only validation logic present in the code.
 - Comments, intent, future plans, and TODOs are not evidence for `Constraint`.
 - Fallback or auto-correction is not a rejection condition, so it usually goes in `Note`.
-- Not only `raise` but also failure paths such as `return Result(False, ...)` count as constraint evidence.
+- Not only `raise` but also failure paths such as `return Result.failure(...)` count as constraint evidence.
 - Do not create free-form constraints outside the allowed patterns.
 
 ### Code patterns accepted as evidence
@@ -76,7 +76,7 @@ Runtime truth takes priority over format. When evidence is insufficient, do not 
 - `if workers > len(data) and not override`
 - `if chunk_size is not None and chunk_size < 0`
 - `raise ValueError(...)`, `raise TypeError(...)`, `raise KeyError(...)`
-- `return Result(False, ...)` or an equivalent failure return
+- `return Result.failure(...)` or an equivalent failure return
 
 ### Allowed patterns
 
@@ -113,7 +113,7 @@ Runtime truth takes priority over format. When evidence is insufficient, do not 
 
 - Write in `Raises` only the exceptions the function actually raises.
 - Use direct raise points such as `raise ValueError(...)` or `raise ResultUnwrapException(...)` as evidence.
-- Paths that express failure as `return Result(False, ...)` go in `Constraint`/`Returns`, not `Raises`.
+- Paths that express failure as `return Result.failure(...)` go in `Constraint`/`Returns`, not `Raises`.
 - Even if an internal function it calls may raise, do not infer it when the current function does not handle it explicitly.
 - Wrap the exception type in backticks and state the trigger condition.
 

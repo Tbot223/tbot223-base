@@ -1,21 +1,24 @@
 [English](../en/README.md)
 
-> 런타임 기준: package version 1.0.0 (`tbot223_base.__version__ == "1.0.0"`).
+> 런타임 기준: package version `1.0.0a0` (`tbot223_base.__version__ == "1.0.0a0"`).
 
 # tbot223-base 문서
 
 `Result`, `ResultStatus`, `ExceptionTracker`를 사용하는 한국어 문서다.
 
+`1.0.0a0`는 재정비 중인 alpha이며 production 사용을 권장하지 않는다. [재정비 문서](rebuilding.md)부터 읽는다.
+
 ## 시작하기
 
 - [Root README](../../README.ko.md): 프로젝트 개요, 설계 의도, 맞는 사용자, 트레이드오프, 빠른 시작.
+- [재정비 문서](rebuilding.md): 철회 이유, 현재 보장, 필수 게이트.
 - [Getting Started](guides/getting-started.md): checkout 또는 editable install 기준 import와 핵심 API 사용법.
 - [실행 가능한 예시](guides/examples.md): `examples/` 아래의 standalone script로 `Result`와 `ExceptionTracker` 흐름 실행.
 - [Package and CI Guide](guides/package-and-ci.md): `pyproject.toml`, editable install, compatibility CI, release publishing 사용법.
 
 ## 레퍼런스
 
-- [Result 레퍼런스](reference/result.md): 상태 모델, `success=` shorthand, unwrap 계열 helper.
+- [Result 레퍼런스](reference/result.md): 필수 payload, typed factory, 상태 모델, unwrap helper.
 - [ExceptionTracker 레퍼런스](reference/exception-tracker.md): debug payload, public payload, masking, safe context capture 정책.
 
 ## 릴리스 노트

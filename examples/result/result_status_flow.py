@@ -6,36 +6,28 @@ import sys
 
 sys.path.insert(0, str(Path(__file__).resolve().parents[2]))
 
-from tbot223_base.result import Result, ResultStatus, ResultUnwrapException
+from tbot223_base.result import Result, ResultUnwrapException
 
 
 def load_profile(user_id: int) -> Result[dict[str, object]]:
     if user_id <= 0:
-        return Result(
-            status=ResultStatus.FAILURE,
+        return Result.failure(
+            {},
             error="User id must be positive.",
             context="Profile.Load",
-            data={},
         )
 
-    return Result(
-        status=ResultStatus.SUCCESS,
-        error=None,
+    return Result.ok(
+        {"user_id": user_id, "name": "Ada"},
         context="Profile.Load",
-        data={"user_id": user_id, "name": "Ada"},
     )
 
 
 def maybe_skip_profile_load(enabled: bool) -> Result[None]:
     if not enabled:
-        return Result(
-            status=ResultStatus.CANCELLED,
-            error=None,
-            context="Profile.Load",
-            data=None,
-        )
+        return Result.cancelled(None, context="Profile.Load")
 
-    return Result(status=ResultStatus.SUCCESS, error=None, context="Profile.Load", data=None)
+    return Result.ok(None, context="Profile.Load")
 
 
 def main() -> None:

@@ -5,7 +5,9 @@ FROM python:3.12-slim
 ENV PYTHONDONTWRITEBYTECODE=1 \
     PYTHONUNBUFFERED=1
 
-WORKDIR /workspace
+WORKDIR /opt/markdownlint
+
+COPY package.json package-lock.json ./
 
 COPY --from=actionlint /usr/local/bin/actionlint /usr/local/bin/actionlint
 
@@ -14,8 +16,16 @@ RUN apt-get update \
         bash \
         ca-certificates \
         git \
+        nodejs \
+        npm \
         rsync \
     && rm -rf /var/lib/apt/lists/*
+
+RUN npm ci
+
+ENV PATH="/opt/markdownlint/node_modules/.bin:${PATH}"
+
+WORKDIR /workspace
 
 COPY pyproject.toml README.md LICENSE ./
 COPY tbot223_base ./tbot223_base
@@ -28,4 +38,4 @@ RUN python -m pip install --upgrade pip \
 COPY . .
 
 ENTRYPOINT ["bash", "scripts/check-release-readiness.sh"]
-CMD ["v1.0.0"]
+CMD ["v1.0.0a0"]

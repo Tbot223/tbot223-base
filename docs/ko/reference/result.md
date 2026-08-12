@@ -1,63 +1,58 @@
 [English](../../en/reference/result.md)
 
-> 런타임 기준: package version 1.0.0 (`tbot223_base.__version__ == "1.0.0"`).
+> 런타임 기준: package version `1.0.0a0` (`tbot223_base.__version__ == "1.0.0a0"`).
 
 # Result 레퍼런스
 
-이 문서는 `ResultStatus`, `Result`, `ResultUnwrapException`을 설명한다.
+이 alpha 레퍼런스는 `ResultStatus`, `Result`, `ResultUnwrapException`을 설명한다.
 
 ## ResultStatus
 
-`ResultStatus`는 세 가지 상태를 가진 string enum이다.
+`ResultStatus`는 `SUCCESS`, `FAILURE`, `CANCELLED` 세 값을 가진 string enum이다. `ResultStatus.normalize()`는 enum, tri-state shorthand(`True`, `False`, `None`), 유효한 status string을 받는다.
 
-| Value | Meaning |
-| --- | --- |
-| `ResultStatus.SUCCESS` | 작업이 성공했다. |
-| `ResultStatus.FAILURE` | 작업이 실패했다. |
-| `ResultStatus.CANCELLED` | 작업이 취소되었거나 실행되지 않았다. |
+## Result Shape
 
-`ResultStatus.normalize()`는 `ResultStatus`, tri-state shorthand 값(`bool` 또는 `None`), 유효한 status string을 받는다.
-
-## Result
-
-`Result[T]`는 immutable tuple-like container이며 다음 필드를 가진다.
+`Result[T]`는 `(status, error, context, data)` 순서의 immutable tuple-like value다. Indexing, unpacking, structural pattern matching, tuple equality를 유지한다.
 
 | Field | Type | Meaning |
 | --- | --- | --- |
-| `status` | `ResultStatus` | 정규화된 작업 상태. |
-| `error` | `Optional[str]` | 사람이 읽을 수 있는 에러 텍스트. |
-| `context` | `Optional[str]` | 작업 맥락. |
-| `data` | `T` | 작업이 반환한 payload. |
+| `status` | `ResultStatus` | 정규화된 outcome 상태. |
+| `error` | `Optional[str]` | 사람이 읽을 수 있는 error text. |
+| `context` | `Optional[str]` | operation context. |
+| `data` | `T` | 모든 상태에서 필요한 payload. |
 
-`success=` 생성자 인자는 tri-state shorthand로 지원된다. 명시적인 enum 형태가 필요하면 새 코드는 `status=ResultStatus...`를 우선 사용한다.
+`data`는 의도적으로 `None`인 경우에도 반드시 제공해야 한다. Result가 payload type을 조용히 바꾸지 않도록 `_make()`, `_replace()`는 public API가 아니며 제공하지 않는다.
 
-Payload 타입을 알고 있다면 `Result[T]`를 사용한다. `unwrap()`과 `expect()`는 `T`를 반환하고, `unwrap_or(default)`는 `T` 또는 default 값 타입을 반환한다.
+## 생성
 
-## Import 경로
+새 코드에서는 typed factory를 우선 사용한다.
 
-`Result`, `ResultStatus`, `ResultUnwrapException`은 `tbot223_base.result`에서 import한다.
+```python
+from tbot223_base.result import Result
 
-## Predicate
+success = Result.ok({"name": "Ada"}, context="LoadProfile")
+failure = Result.failure(None, error="not found", context="LoadProfile")
+cancelled = Result.cancelled(None, context="LoadProfile")
+```
 
-- `result.success`: tri-state shorthand property이며 `True`, `False`, `None`을 반환한다.
-- `result.is_success`: `ResultStatus.SUCCESS`일 때만 `True`.
-- `result.is_failure`: `ResultStatus.FAILURE`일 때만 `True`.
-- `result.is_cancelled`: `ResultStatus.CANCELLED`일 때만 `True`.
-
-## Unwrap helper
-
-- `unwrap()`: 성공이면 `T`를 반환하고, 아니면 `ResultUnwrapException`을 raise한다.
-- `expect(msg="")`: 성공이면 `T`를 반환하고, 아니면 custom message로 raise한다.
-- `unwrap_or(default)`: 성공이면 `T`, 아니면 `default`를 반환한다.
-
-## Example
+정규화된 status form이 필요하면 explicit construction도 사용할 수 있다.
 
 ```python
 from tbot223_base.result import Result, ResultStatus
 
-result: Result[dict[str, str]] = Result(ResultStatus.FAILURE, "not found", "LoadProfile", None)
-
-if result.is_failure:
-    fallback = result.unwrap_or({"name": "anonymous"})
-    print(fallback)
+result: Result[int] = Result(ResultStatus.SUCCESS, None, "Compute", 42)
 ```
+
+`success=` input과 `result.success` property는 이 alpha 동안 tri-state shorthand로 유지한다. `result.success`는 `True`, `False`, `None`을 반환하고 `is_success`, `is_failure`, `is_cancelled`는 boolean predicate다.
+
+## Unwrap helper
+
+- `unwrap()`은 success일 때만 `T`를 반환한다.
+- `expect(msg="")`는 success일 때만 `T`를 반환하고 실패 시 `msg`를 기록한다.
+- `unwrap_or(default)`는 success일 때 `T`, 그 외에는 전달한 default를 반환한다.
+
+`unwrap()`과 `expect()`는 non-success result에서 `ResultUnwrapException`을 raise한다. 고정된 메시지는 저장된 `error`, `context`, `data`를 stringification하지 않으며 원본 값은 exception attribute로 남는다.
+
+## Import 경로
+
+`Result`, `ResultStatus`, `ResultUnwrapException`은 `tbot223_base.result`에서 import한다.

@@ -145,7 +145,8 @@ class ExceptionTrackerHelper:
         >>> from tbot223_base.exception_tracker import ExceptionTrackerHelper
         >>> helper = ExceptionTrackerHelper()
         >>> info = helper.get_system_info()
-        >>> print(info)
+        >>> isinstance(info, dict)
+        True
         """
         try:
             cwd = os.getcwd()
@@ -197,7 +198,8 @@ class ExceptionTrackerHelper:
         >>> from tbot223_base.exception_tracker import ExceptionTrackerHelper
         >>> helper = ExceptionTrackerHelper()
         >>> error_info = helper.get_error_info_structure()
-        >>> print(error_info)
+        >>> error_info["error"]["type"] is None
+        True
         """
         return {
             "id": None,
@@ -260,7 +262,8 @@ class ExceptionTrackerHelper:
         >>> from tbot223_base.exception_tracker import ExceptionTrackerHelper
         >>> helper = ExceptionTrackerHelper()
         >>> public_error_info = helper.get_public_error_info_structure()
-        >>> print(public_error_info)
+        >>> public_error_info["error"]["code"] is None
+        True
         """
         return {
             "id": None,
@@ -326,7 +329,7 @@ class ExceptionTracker:
 
     def __init__(self) -> None:
         """
-        Initialize an `ExceptionTracker` with a startup system snapshot.
+        Initialize an `ExceptionTracker` with deferred debug system collection.
 
         - **(R)** = Required argument
         - **(O)** = Optional argument (has a default value)
@@ -336,9 +339,13 @@ class ExceptionTracker:
         None
 
         ### Returns
-        `None` — Initializes the tracker and caches startup system information.
+        `None` — Initializes a tracker that snapshots system information on its first debug call.
+
+        ### Note
+        > Public-safe methods and location lookups do not collect system information.
         """
-        self._system_info = ExceptionTrackerHelper.get_system_info()
+        self._system_info: Optional[Dict[str, object]] = None
+        self._system_info_lock = threading.Lock()
 
     @staticmethod
     def _format_location(location: Mapping[str, object]) -> str:
@@ -375,6 +382,17 @@ class ExceptionTracker:
     def _copy_system_info_snapshot(system_info: Mapping[str, object]) -> Dict[str, object]:
         """Return an isolated system information snapshot copy."""
         return cast(Dict[str, object], deepcopy(dict(system_info)))
+
+    def _get_startup_system_info(self) -> Dict[str, object]:
+        """Lazily collect one shared startup snapshot for debug-heavy payloads."""
+        cached_system_info = self._system_info
+        if cached_system_info is not None:
+            return cached_system_info
+
+        with self._system_info_lock:
+            if self._system_info is None:
+                self._system_info = ExceptionTrackerHelper.get_system_info()
+            return self._system_info
 
     @classmethod
     def _normalize_public_tag_key(cls, key: object) -> Optional[str]:
@@ -477,7 +495,7 @@ class ExceptionTracker:
         data: _PayloadT,
     ) -> Result[_PayloadT]:
         """Build the common failure `Result` wrapper."""
-        return Result(ResultStatus.FAILURE, error, context, data)
+        return Result.failure(data, error=error, context=context)
 
     @staticmethod
     def _build_handler_failure_payload(error: Exception) -> Tuple[str, str]:
@@ -656,7 +674,7 @@ class ExceptionTracker:
 
         copied_items: Dict[str, object] = {}
         for key, item in value.items():
-            if not isinstance(key, str) or len(key) > cls.CONTEXT_MAX_VALUE_LENGTH:
+            if type(key) is not str or len(key) > cls.CONTEXT_MAX_VALUE_LENGTH:
                 continue
             is_small, copied_item = cls._copy_safe_context_primitive(item)
             if is_small:
@@ -904,8 +922,13 @@ class ExceptionTracker:
             self._frame_to_traceback_frame(frame)
             for frame in limited_frames
         ]
-        error_info["system_info"]["started_at"] = self._copy_system_info_snapshot(self._system_info)
-        error_info["system_info"]["now"] = ExceptionTrackerHelper.get_system_info()
+        startup_system_info = self._get_startup_system_info()
+        error_info["system_info"]["started_at"] = self._copy_system_info_snapshot(
+            startup_system_info
+        )
+        error_info["system_info"]["now"] = self._copy_system_info_snapshot(
+            startup_system_info
+        )
         return error_info
 
     def _apply_debug_error_masks(
@@ -962,13 +985,14 @@ class ExceptionTracker:
         ...     1 / 0
         ... except Exception as e:
         ...     location_result = tracker.get_exception_location(e)
-        >>> print(location_result.data)
+        >>> location_result.is_success
+        True
         """
         try:
             tb = traceback.extract_tb(error.__traceback__)
             origin_frame = tb[-1] if tb else None
             origin_location = self._frame_to_location(origin_frame)
-            return Result(ResultStatus.SUCCESS, None, None, self._format_location(origin_location))
+            return Result.ok(self._format_location(origin_location))
         except Exception as e:
             error_message, traceback_text = self._build_handler_failure_payload(e)
             return self._build_failure_result(
@@ -1042,7 +1066,8 @@ class ExceptionTracker:
         ...         mask_presets=("private", "traceback"),
         ...         mask_paths=["id", ("error", "message")]
         ...     )
-        ...     print(result.status)
+        ...     result.is_failure
+        True
         """
         try:
             error_info = self._build_debug_error_info(
@@ -1107,7 +1132,8 @@ class ExceptionTracker:
         ...         tags={"layer": "service"},
         ...         retryable=False
         ...     )
-        ...     print(result.data["error"]["code"])
+        ...     result.data["error"]["code"]
+        'DIVIDE_BY_ZERO'
         """
         try:
             public_error_info = self._build_public_error_info(
@@ -1255,14 +1281,11 @@ class ExceptionTracker:
         | **(R)** | `error_id_map` | `Mapping[str, object]` | A mapping from exception type names to project-defined error codes. |
         | **(R)** | `error` | `Exception` | The exception object to get the error code for. |
 
-        ### Constraint
-        > - `type(error).__name__` MUST satisfy `in error_id_map`.
-
         ### Returns
-        `Result` — Contains the mapped error code in `data`.
+        `Result` — Contains the mapped code in `data` on success or `None` when no mapping exists.
 
         ### Note
-        > `error_id_map` allows each project to define its own exception codes.
+        > `error_id_map` allows each project to define its own exception codes. A missing type is an expected failure result and does not invoke the emergency handler.
         > Example: `{ "ZeroDivisionError": 1001, "ValueError": 1002 }`.
 
         ### Example
@@ -1273,13 +1296,13 @@ class ExceptionTracker:
         ...     1 / 0
         ... except Exception as e:
         ...     code_result = tracker.get_error_code(error_id_map, e)
-        >>> print(code_result.data)
+        >>> code_result.data
+        1001
         """
+        missing_code = object()
+        error_type_name = type(error).__name__
         try:
-            if type(error).__name__ not in error_id_map:
-                raise KeyError(f"Error type '{type(error).__name__}' not found in error_id_map.")
-            else:
-                return Result(ResultStatus.SUCCESS, None, None, error_id_map[type(error).__name__])
+            error_code = error_id_map.get(error_type_name, missing_code)
         except Exception as e:
             error_message, traceback_text = self._build_handler_failure_payload(e)
             return self._build_failure_result(
@@ -1287,6 +1310,14 @@ class ExceptionTracker:
                 "Core.ExceptionTracker.get_error_code, L2",
                 cast(object, traceback_text),
             )
+
+        if error_code is missing_code:
+            return self._build_failure_result(
+                f"Error type '{error_type_name}' is not configured in error_id_map.",
+                "Core.ExceptionTracker.get_error_code, L2",
+                cast(object, None),
+            )
+        return Result.ok(error_code)
 
 
 class ExceptionTrackerDecorator:
@@ -1335,7 +1366,8 @@ class ExceptionTrackerDecorator:
     ...     return x / y
     >>> risky_function = ExceptionTrackerDecorator(mask_presets=("private", "traceback"), mask_paths=["id"], tracker=tracker)(risky_function)
     >>> result = risky_function(10, y=0)
-    >>> print(result.status)
+    >>> result.is_failure
+    True
     """
     def __init__(
         self,
@@ -1343,6 +1375,19 @@ class ExceptionTrackerDecorator:
         mask_paths: MaskPathsInput = (),
         tracker: Optional[ExceptionTracker] = None,
     ) -> None:
+        """
+        Initialize a function-boundary exception tracker decorator.
+
+        ### Arguments
+        | Tag | Name | Type | Description |
+        |-----|------|------|-------------|
+        | **(O)** | `mask_presets` | `MaskPresetsInput` | Named debug mask presets. Default: `("default",)`. |
+        | **(O)** | `mask_paths` | `MaskPathsInput` | Extra debug paths to mask. Default: `()`. |
+        | **(D)** | `tracker` | `Optional[ExceptionTracker]` | Reused tracker instance. Default: `None`; creates a new tracker. |
+
+        ### Returns
+        `None` — Initializes the decorator configuration.
+        """
         self.tracker = tracker or ExceptionTracker()
         self.mask_presets = ExceptionTracker._normalize_mask_presets(mask_presets)
         self.mask_paths = ExceptionTracker._normalize_mask_paths(mask_paths)

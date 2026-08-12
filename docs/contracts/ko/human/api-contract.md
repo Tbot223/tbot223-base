@@ -1,6 +1,6 @@
 [English](../../en/human/api-contract.md)
 
-> Contract revision: 2026-07-10.
+> Contract revision: 2026-08-12.
 
 # API Contract
 
@@ -8,7 +8,7 @@
 
 ## 1. 목표
 
-- pre-release public API를 Python 관례에 맞는 canonical module path 중심으로 정의한다.
+- 재정비 alpha public API를 Python 관례에 맞는 canonical module path 중심으로 정의한다.
 - `Result`를 Rust compatibility target이 아니라 독립적으로 형성된 Python 경계 교환 프로토콜로 정의한다.
 - debug/public 예외 payload를 우연히 만들어진 dict가 아니라 명시적 계약으로 다룬다.
 - 내부 진단 정보와 외부 노출용 error payload의 안전 경계를 유지한다.
@@ -51,6 +51,8 @@ Public code는 다음 canonical path를 MUST 사용한다.
 
 `ResultStatus`는 `success`, `failure`, `cancelled` string value를 MUST 유지한다.
 
+`Result.data`는 의도적인 `None`을 포함해 모든 result 상태에서 반드시 제공해야 한다. `Result.ok(data)`, `Result.failure(data, ...)`, `Result.cancelled(data, ...)`가 권장 typed construction API다. `Result`는 tuple-like read behavior를 유지하지만 raw `_make()`, `_replace()` reconstruction helper를 노출해서는 안 된다.
+
 `Result`는 Python 코드의 경계에서 쓰는 exchange shape로 문서화해야 한다. Rust의 `Result`를 언급할 때는 비교 기준으로만 다뤄야 하며, 원형이나 compatibility target으로 설명해서는 안 된다.
 
 `success=` 입력과 `result.success` property는 문서화된 breaking change로 제거되기 전까지 지원되는 tri-state shorthand API로 SHOULD 유지한다.
@@ -64,7 +66,7 @@ Public code는 다음 canonical path를 MUST 사용한다.
 | Debug-heavy | `get_exception_info()`, `get_exception_return()` | trusted internal diagnostics. |
 | Public-safe | `get_public_exception_info()`, `get_public_exception_return()` | API response, UI surface, untrusted boundary. |
 
-Debug payload는 mask되었거나 수집할 수 없는 경우를 제외하고 structured failure metadata, location information, copied safe context, chained causes, traceback data, system information을 MUST 포함한다.
+Debug payload는 mask되었거나 수집할 수 없는 경우를 제외하고 structured failure metadata, location information, copied safe context, chained causes, traceback data, system information을 MUST 포함한다. Shared system snapshot 하나는 첫 debug-heavy 호출에서 lazy 수집하고 이후 재사용해야 하며 public-safe method와 location lookup은 이를 수집해서는 안 된다.
 
 Public payload는 lightweight하게 유지해야 하며 traceback text, traceback frames, local variables, params, user input, system information을 MUST NOT 포함한다.
 
@@ -90,7 +92,7 @@ Public tag key는 bounded string으로 MUST 정규화한다. Public tag value는
 
 ## 7. Debug Safety Rules
 
-Debug context capture는 raw object reference를 보존하지 않아야 한다.
+Debug context capture는 raw object reference를 보존하지 않아야 한다. Mapping key는 exact built-in `str`이어야 하며 custom `str` subclass를 identity로 복사해서는 안 된다.
 
 작은 primitive 값은 복사할 수 있다. 무겁거나, 깊거나, 지원하지 않거나, custom object인 값은 `"<BLOCKED>"`로 MUST 대체한다.
 
@@ -106,11 +108,12 @@ Mask preset과 명시적 mask path는 context capture 이후에 MUST 적용한�
 
 - Canonical import path.
 - Package-level public export.
-- `ResultStatus` normalization과 `success=` shorthand behavior.
+- `ResultStatus` normalization, 필수 `data`, typed factory, 거부되는 raw reconstruction helper.
 - Debug payload masking과 safe context capture.
 - Public payload의 최소 field와 debug-only field 부재.
 - Public tag JSON serialization과 caller-owned object reference 부재.
 - Decorator가 synchronous/async uncaught exception을 failure `Result`로 변환하는 동작.
+- Lazy debug system collection, deterministic public docstring, 거부되는 invalid consumer typing.
 
 Python compatibility CI는 push, pull request, manual dispatch, release-like checkpoint 전에 선언된 Python version matrix에서 test suite와 package type check를 SHOULD 실행한다.
 

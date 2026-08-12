@@ -497,6 +497,46 @@ def test_debug_system_info_started_at_is_isolated_between_payloads():
     assert "mutated" not in second_started_at
 
 
+def test_system_snapshot_is_lazy_and_collected_once_for_debug_calls(monkeypatch):
+    calls = []
+
+    def fake_system_info(cls):
+        calls.append(len(calls) + 1)
+        return {"call": calls[-1]}
+
+    monkeypatch.setattr(
+        exception_tracker.ExceptionTrackerHelper,
+        "get_system_info",
+        classmethod(fake_system_info),
+    )
+    tracker = ExceptionTracker()
+
+    assert calls == []
+    tracker.get_public_exception_info(RuntimeError("public"))
+    assert calls == []
+    tracker.get_exception_location(RuntimeError("not raised"))
+    assert calls == []
+
+    def build_debug_result(worker_id):
+        try:
+            raise RuntimeError(f"debug-{worker_id}")
+        except Exception as error:
+            return tracker.get_exception_info(error, mask_presets=())
+
+    with ThreadPoolExecutor(max_workers=4) as executor:
+        results = list(executor.map(build_debug_result, range(8)))
+
+    assert calls == [1]
+    for result in results:
+        assert result.data["system_info"]["started_at"] == {"call": 1}
+        assert result.data["system_info"]["now"] == {"call": 1}
+
+    later_result = build_debug_result("later")
+    assert later_result.data["system_info"]["started_at"] == {"call": 1}
+    assert later_result.data["system_info"]["now"] == {"call": 1}
+    assert calls == [1]
+
+
 def test_format_location_and_traceback_helpers_handle_missing_values():
     tracker = ExceptionTracker()
     empty_error = RuntimeError("not raised")
@@ -615,6 +655,15 @@ def test_copy_safe_context_blocks_scalar_subclasses_without_retaining_identity()
         assert is_small is False
         assert copied_value == ExceptionTracker.BLOCKED_VALUE
         assert copied_value is not value
+
+
+def test_copy_safe_context_drops_custom_string_keys_without_retaining_identity():
+    custom_key = _CustomText("secret")
+    copied = ExceptionTracker._copy_safe_context({custom_key: "value", "plain": "safe"})
+
+    assert copied == {"plain": "safe"}
+    assert all(type(key) is str for key in copied)
+    assert not _contains_identity(copied, custom_key)
 
 
 def test_get_exception_info_blocks_scalar_subclasses_in_debug_context():
@@ -896,7 +945,7 @@ def test_public_exception_return_uses_safe_defaults():
     }
 
 
-def test_get_error_code_returns_success_and_failure_results():
+def test_get_error_code_returns_success_and_silent_missing_mapping_failure(capsys):
     tracker = ExceptionTracker()
 
     try:
@@ -908,7 +957,10 @@ def test_get_error_code_returns_success_and_failure_results():
     assert success_result.status is ResultStatus.SUCCESS
     assert success_result.data == 1001
     assert failure_result.status is ResultStatus.FAILURE
-    assert "KeyError" in failure_result.error
+    assert failure_result.data is None
+    assert failure_result.error == "Error type 'ZeroDivisionError' is not configured in error_id_map."
+    assert failure_result.context == "Core.ExceptionTracker.get_error_code, L2"
+    assert capsys.readouterr().out == ""
 
 
 def test_exception_tracker_decorator_converts_exception_to_result():

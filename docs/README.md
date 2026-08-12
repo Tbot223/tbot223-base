@@ -1,11 +1,13 @@
 [English](en/README.md)
 [한국어 (Korean)](ko/README.md)
 
-> Runtime baseline: package version 1.0.0 (`tbot223_base.__version__ == "1.0.0"`).
+> Runtime baseline: package version `1.0.0a0` (`tbot223_base.__version__ == "1.0.0a0"`).
 
 # Documentation
 
 This directory contains user-facing documentation and repository writing contracts for `tbot223-base`.
+
+The package is currently being rebuilt and is not recommended for production use. See [English rebuilding status](en/rebuilding.md) or [Korean rebuilding status](ko/rebuilding.md).
 
 ## User Docs
 
@@ -13,6 +15,7 @@ This directory contains user-facing documentation and repository writing contrac
 - English: [en/README.md](en/README.md)
 - Korean: [ko/README.md](ko/README.md)
 - Package and CI guide: [en](en/guides/package-and-ci.md), [ko](ko/guides/package-and-ci.md)
+- Rebuilding status: [en](en/rebuilding.md), [ko](ko/rebuilding.md)
 
 ## Contract Docs
 

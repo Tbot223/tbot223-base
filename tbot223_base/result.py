@@ -1,20 +1,16 @@
-# external modules
-from collections.abc import Iterable
-from enum import Enum
-from typing import Any, TYPE_CHECKING, Generic, NamedTuple, Optional, TypeVar, Union, cast
+"""Explicit immutable operation results."""
 
-# internal modules
+from enum import Enum
+from typing import ClassVar, Generic, Literal, Optional, TypeVar, Union, cast, overload
+
 
 _RESULT_SENTINEL = object()
 _DataT = TypeVar("_DataT")
 _DefaultT = TypeVar("_DefaultT")
-_ResultT = TypeVar("_ResultT", bound="Result[Any]")
 
 
 class ResultStatus(str, Enum):
-    """
-    Explicit status enum for `Result`.
-    """
+    """Define the explicit outcome states supported by `Result`."""
 
     SUCCESS = "success"
     FAILURE = "failure"
@@ -23,7 +19,18 @@ class ResultStatus(str, Enum):
     @classmethod
     def normalize(cls, value: object) -> "ResultStatus":
         """
-        Normalize `ResultStatus`, tri-state shorthand, and string input into a `ResultStatus`.
+        Normalize a status enum, tri-state shorthand, or status string.
+
+        ### Arguments
+        | Tag | Name | Type | Description |
+        |-----|------|------|-------------|
+        | **(R)** | `value` | `object` | A `ResultStatus`, `bool`, `None`, or valid status string. |
+
+        ### Returns
+        `ResultStatus` — The normalized explicit outcome state.
+
+        ### Raises
+        `ValueError` — If `value` is not a supported status representation.
         """
         if isinstance(value, cls):
             return value
@@ -44,13 +51,11 @@ class ResultStatus(str, Enum):
 
 
 class ResultUnwrapException(RuntimeError):
-    """
-    Raised when `unwrap()` or `expect()` is called on a `Result` that does not represent success.
-    """
+    """Represent an attempt to unwrap a non-success `Result`."""
 
     def __init__(self, error: Optional[str], context: Optional[str], data: object) -> None:
         """
-        Initialize the exception with the details stored in the `Result`.
+        Initialize an unwrap failure without formatting stored result values.
 
         ### Arguments
         | Tag | Name | Type | Description |
@@ -65,78 +70,115 @@ class ResultUnwrapException(RuntimeError):
         ### Example
         >>> from tbot223_base.result import Result, ResultStatus, ResultUnwrapException
         >>> try:
-        ...     result = Result(status=ResultStatus.FAILURE, error="Some error", context="TestContext", data=None)
-        ...     result.unwrap()
-        ... except ResultUnwrapException as e:
-        ...     print(e)
+        ...     Result(ResultStatus.FAILURE, "Some error", "TestContext", None).unwrap()
+        ... except ResultUnwrapException as error:
+        ...     str(error)
+        'Cannot unwrap a non-success Result.'
         """
-        super().__init__(f"Cannot unwrap Result: {error}, Context: {context}, Data: {data}")
+        super().__init__("Cannot unwrap a non-success Result.")
         self.error = error
         self.context = context
         self.data = data
 
 
-if TYPE_CHECKING:
-    class _ResultBase(NamedTuple, Generic[_DataT]):
-        status: ResultStatus
-        error: Optional[str]
-        context: Optional[str]
-        data: _DataT
-else:
-    class _ResultBase(NamedTuple):
-        status: ResultStatus
-        error: Optional[str]
-        context: Optional[str]
-        data: object
-
-
-class Result(_ResultBase[_DataT], Generic[_DataT]):
+class Result(tuple, Generic[_DataT]):
     """
-    Immutable tuple-like container that represents the outcome of an operation.
+    Represent an immutable tuple-like operation outcome with explicit payload data.
 
-    `Result[_DataT]` stores an explicit `status` based on `ResultStatus`, so success,
-    failure, and cancelled states are modeled directly instead of sharing one
-    `Optional[bool]` field. The `success=` input and `result.success` property
-    are supported tri-state shorthand APIs.
-
-    - **(R)** = Required argument
-    - **(O)** = Optional argument (has a default value)
-    - **(D)** = Dependency Injection (advanced usage)
+    `Result[_DataT]` stores `(status, error, context, data)` and keeps tuple
+    unpacking, indexing, and equality semantics. `data` is required for every
+    result state; use `None` explicitly when a result intentionally has no payload.
 
     ### Arguments
     | Tag | Name | Type | Description |
     |-----|------|------|-------------|
-    | **(R)** | `status` | `ResultStatus` | Overall outcome. Use `SUCCESS`, `FAILURE`, or `CANCELLED`. |
-    | **(R)** | `error` | `Optional[str]` | Human-readable error message. |
-    | **(R)** | `context` | `Optional[str]` | Additional context about the operation. |
-    | **(R)** | `data` | `_DataT` | Data returned from the operation. |
+    | **(R)** | `status` | `ResultStatus` | Overall outcome when using positional construction. |
+    | **(O)** | `error` | `Optional[str]` | Human-readable error message. Default: `None`. |
+    | **(O)** | `context` | `Optional[str]` | Additional context about the operation. Default: `None`. |
+    | **(R)** | `data` | `_DataT` | Payload for the outcome. |
+
+    ### Raises
+    `TypeError` — If `status` is missing, `status` and `success` are both supplied, or `data` is omitted.
 
     ### Note
-    > - Use `Result[T]` when the payload type is known.
-    > - `unwrap()`, `expect()`, and `unwrap_or()` are convenience methods.
-    > - `unwrap()` and `expect()` return `_DataT`.
-    > - `success=` is supported as tri-state shorthand and is normalized into `status`.
-    > - `result.success` returns the tri-state shorthand value `True`, `False`, or `None`.
-    > - In most code, directly checking `status`, `error`, and `data` is recommended.
+    > - Use `Result.ok()`, `Result.failure()`, or `Result.cancelled()` for new code.
+    > - `success=` remains a tri-state construction shorthand and is normalized into `status`.
+    > - Raw `NamedTuple` reconstruction helpers are intentionally not part of this API.
 
     ### Example
-    >>> from tbot223_base.result import Result, ResultStatus
-    >>> result: Result[dict[str, str]] = Result(status=ResultStatus.SUCCESS, error=None, context="FetchData", data={"key": "value"})
-    >>> if result.is_success:
-    ...     print("Operation succeeded with data:", result.data)
+    >>> from tbot223_base.result import Result
+    >>> result = Result.ok({"key": "value"}, context="FetchData")
+    >>> result.unwrap()["key"]
+    'value'
     """
 
     __slots__ = ()
+    _fields: ClassVar[tuple[str, str, str, str]] = ("status", "error", "context", "data")
+    __match_args__: ClassVar[
+        tuple[Literal["status"], Literal["error"], Literal["context"], Literal["data"]]
+    ] = ("status", "error", "context", "data")
+
+    @overload
+    def __new__(
+        cls: type["Result[_DataT]"],
+        status: object,
+        error: Optional[str],
+        context: Optional[str],
+        data: _DataT,
+        /,
+    ) -> "Result[_DataT]":
+        ...
+
+    @overload
+    def __new__(
+        cls: type["Result[_DataT]"],
+        *,
+        status: object,
+        data: _DataT,
+        error: Optional[str] = ...,
+        context: Optional[str] = ...,
+    ) -> "Result[_DataT]":
+        ...
+
+    @overload
+    def __new__(
+        cls: type["Result[_DataT]"],
+        *,
+        success: object,
+        data: _DataT,
+        error: Optional[str] = ...,
+        context: Optional[str] = ...,
+    ) -> "Result[_DataT]":
+        ...
 
     def __new__(
         cls: type["Result[_DataT]"],
         status: object = _RESULT_SENTINEL,
         error: Optional[str] = None,
         context: Optional[str] = None,
-        data: _DataT = cast(_DataT, None),
+        data: object = _RESULT_SENTINEL,
         *,
         success: object = _RESULT_SENTINEL,
     ) -> "Result[_DataT]":
+        """
+        Create an immutable result with explicit status and payload data.
+
+        ### Arguments
+        | Tag | Name | Type | Description |
+        |-----|------|------|-------------|
+        | **(R)** | `status` | `object` | Status value unless `success` shorthand is supplied. |
+        | **(O)** | `error` | `Optional[str]` | Human-readable error message. Default: `None`. |
+        | **(O)** | `context` | `Optional[str]` | Additional operation context. Default: `None`. |
+        | **(R)** | `data` | `_DataT` | Payload for every outcome state. |
+        | **(O)** | `success` | `object` | Tri-state shorthand used instead of `status`. |
+
+        ### Returns
+        `Result[_DataT]` — An immutable normalized result.
+
+        ### Raises
+        `TypeError` — If required construction inputs are absent or both status forms are supplied.
+        `ValueError` — If the supplied status cannot be normalized.
+        """
         if success is not _RESULT_SENTINEL:
             if status is not _RESULT_SENTINEL:
                 raise TypeError("Use either `status` or `success` shorthand, not both.")
@@ -144,35 +186,144 @@ class Result(_ResultBase[_DataT], Generic[_DataT]):
 
         if status is _RESULT_SENTINEL:
             raise TypeError("Missing required argument: `status`.")
+        if data is _RESULT_SENTINEL:
+            raise TypeError("Missing required argument: `data`.")
 
         normalized_status = ResultStatus.normalize(status)
-        return cast("Result[_DataT]", tuple.__new__(cls, (normalized_status, error, context, data)))
-
-    if not TYPE_CHECKING:
-        @classmethod
-        def _make(cls: type[_ResultT], iterable: Iterable[object]) -> _ResultT:
-            values = tuple(iterable)
-            if len(values) != len(cls._fields):
-                raise TypeError(f"Expected {len(cls._fields)} arguments, got {len(values)}")
-            return cls(*values)
-
-    def _replace(self: _ResultT, /, **kwds: object) -> _ResultT:
-        unexpected_fields = set(kwds).difference(self._fields)
-        if unexpected_fields:
-            field_names = ", ".join(sorted(unexpected_fields))
-            raise TypeError(f"Got unexpected field names: {field_names}")
-
-        return type(self)(
-            kwds.get("status", self.status),
-            cast(Optional[str], kwds.get("error", self.error)),
-            cast(Optional[str], kwds.get("context", self.context)),
-            kwds.get("data", self.data),
+        return cast(
+            "Result[_DataT]",
+            tuple.__new__(cls, (normalized_status, error, context, data)),
         )
+
+    @classmethod
+    def ok(
+        cls: type["Result[_DataT]"],
+        data: _DataT,
+        *,
+        context: Optional[str] = None,
+    ) -> "Result[_DataT]":
+        """
+        Build a successful `Result` with required payload data.
+
+        ### Arguments
+        | Tag | Name | Type | Description |
+        |-----|------|------|-------------|
+        | **(R)** | `data` | `_DataT` | Payload returned by the successful operation. |
+        | **(O)** | `context` | `Optional[str]` | Additional operation context. Default: `None`. |
+
+        ### Returns
+        `Result[_DataT]` — A result with `ResultStatus.SUCCESS`.
+        """
+        return cls(ResultStatus.SUCCESS, None, context, data)
+
+    @classmethod
+    def failure(
+        cls: type["Result[_DataT]"],
+        data: _DataT,
+        *,
+        error: Optional[str] = None,
+        context: Optional[str] = None,
+    ) -> "Result[_DataT]":
+        """
+        Build a failed `Result` with required payload data.
+
+        ### Arguments
+        | Tag | Name | Type | Description |
+        |-----|------|------|-------------|
+        | **(R)** | `data` | `_DataT` | Payload associated with the failed operation. |
+        | **(O)** | `error` | `Optional[str]` | Human-readable failure message. Default: `None`. |
+        | **(O)** | `context` | `Optional[str]` | Additional operation context. Default: `None`. |
+
+        ### Returns
+        `Result[_DataT]` — A result with `ResultStatus.FAILURE`.
+        """
+        return cls(ResultStatus.FAILURE, error, context, data)
+
+    @classmethod
+    def cancelled(
+        cls: type["Result[_DataT]"],
+        data: _DataT,
+        *,
+        error: Optional[str] = None,
+        context: Optional[str] = None,
+    ) -> "Result[_DataT]":
+        """
+        Build a cancelled `Result` with required payload data.
+
+        ### Arguments
+        | Tag | Name | Type | Description |
+        |-----|------|------|-------------|
+        | **(R)** | `data` | `_DataT` | Payload associated with the cancelled operation. |
+        | **(O)** | `error` | `Optional[str]` | Cancellation message. Default: `None`. |
+        | **(O)** | `context` | `Optional[str]` | Additional operation context. Default: `None`. |
+
+        ### Returns
+        `Result[_DataT]` — A result with `ResultStatus.CANCELLED`.
+        """
+        return cls(ResultStatus.CANCELLED, error, context, data)
+
+    @property
+    def status(self) -> ResultStatus:
+        """
+        Return the normalized explicit outcome state.
+
+        ### Arguments
+        None
+
+        ### Returns
+        `ResultStatus` — The stored outcome state.
+        """
+        return cast(ResultStatus, self[0])
+
+    @property
+    def error(self) -> Optional[str]:
+        """
+        Return the stored human-readable error message.
+
+        ### Arguments
+        None
+
+        ### Returns
+        `Optional[str]` — The stored error message, if any.
+        """
+        return cast(Optional[str], self[1])
+
+    @property
+    def context(self) -> Optional[str]:
+        """
+        Return the stored operation context.
+
+        ### Arguments
+        None
+
+        ### Returns
+        `Optional[str]` — The stored context, if any.
+        """
+        return cast(Optional[str], self[2])
+
+    @property
+    def data(self) -> _DataT:
+        """
+        Return the payload stored for this outcome.
+
+        ### Arguments
+        None
+
+        ### Returns
+        `_DataT` — The stored payload.
+        """
+        return cast(_DataT, self[3])
 
     @property
     def success(self) -> Optional[bool]:
         """
         Return the tri-state shorthand value for the current `status`.
+
+        ### Arguments
+        None
+
+        ### Returns
+        `Optional[bool]` — `True`, `False`, or `None` for success, failure, or cancellation.
         """
         if self.status is ResultStatus.SUCCESS:
             return True
@@ -183,69 +334,89 @@ class Result(_ResultBase[_DataT], Generic[_DataT]):
     @property
     def is_success(self) -> bool:
         """
-        Return whether the result represents success.
+        Return whether this result represents success.
+
+        ### Arguments
+        None
+
+        ### Returns
+        `bool` — `True` only when `status` is `ResultStatus.SUCCESS`.
         """
         return self.status is ResultStatus.SUCCESS
 
     @property
     def is_failure(self) -> bool:
         """
-        Return whether the result represents failure.
+        Return whether this result represents failure.
+
+        ### Arguments
+        None
+
+        ### Returns
+        `bool` — `True` only when `status` is `ResultStatus.FAILURE`.
         """
         return self.status is ResultStatus.FAILURE
 
     @property
     def is_cancelled(self) -> bool:
         """
-        Return whether the result represents a cancelled or non-executed state.
+        Return whether this result represents cancellation.
+
+        ### Arguments
+        None
+
+        ### Returns
+        `bool` — `True` only when `status` is `ResultStatus.CANCELLED`.
         """
         return self.status is ResultStatus.CANCELLED
 
     def unwrap(self) -> _DataT:
         """
-        Return the contained `data` if the result is successful.
+        Return `data` when this result is successful.
 
         ### Arguments
         None
 
-        ### Constraint
-        > - `self.status` MUST be `ResultStatus.SUCCESS`.
-
         ### Returns
         `_DataT` — The stored payload.
 
+        ### Raises
+        `ResultUnwrapException` — If `status` is not `ResultStatus.SUCCESS`.
+
         ### Example
-        >>> from tbot223_base.result import Result, ResultStatus
-        >>> result: Result[dict[str, str]] = Result(status=ResultStatus.SUCCESS, error=None, context="FetchData", data={"key": "value"})
-        >>> data = result.unwrap()
-        >>> print(data)
+        >>> from tbot223_base.result import Result
+        >>> Result.ok({"key": "value"}).unwrap()["key"]
+        'value'
         """
         if self.is_success:
             return self.data
         if self.is_failure:
             raise ResultUnwrapException(self.error, self.context, self.data)
-        raise ResultUnwrapException("Operation was cancelled or not executed.", self.context, self.data)
+        raise ResultUnwrapException(
+            self.error or "Operation was cancelled or not executed.",
+            self.context,
+            self.data,
+        )
 
     def expect(self, msg: str = "") -> _DataT:
         """
-        Return the contained `data` if the result is successful.
+        Return `data` when successful or raise with an optional caller message.
 
         ### Arguments
         | Tag | Name | Type | Description |
         |-----|------|------|-------------|
-        | **(O)** | `msg` | `str` | Optional message to use if the result is not successful. Default: `""`. |
-
-        ### Constraint
-        > - `self.status` MUST be `ResultStatus.SUCCESS`.
+        | **(O)** | `msg` | `str` | Message stored on the unwrap exception. Default: `""`. |
 
         ### Returns
         `_DataT` — The stored payload.
 
+        ### Raises
+        `ResultUnwrapException` — If `status` is not `ResultStatus.SUCCESS`.
+
         ### Example
-        >>> from tbot223_base.result import Result, ResultStatus
-        >>> result: Result[dict[str, str]] = Result(status=ResultStatus.SUCCESS, error=None, context="FetchData", data={"key": "value"})
-        >>> data = result.expect("Should not fail")
-        >>> print(data)
+        >>> from tbot223_base.result import Result
+        >>> Result.ok(42).expect("Should not fail")
+        42
         """
         if self.is_success:
             return self.data
@@ -256,21 +427,20 @@ class Result(_ResultBase[_DataT], Generic[_DataT]):
 
     def unwrap_or(self, default: _DefaultT) -> Union[_DataT, _DefaultT]:
         """
-        Return the contained `data` if successful; otherwise return `default`.
+        Return `data` when successful and `default` otherwise.
 
         ### Arguments
         | Tag | Name | Type | Description |
         |-----|------|------|-------------|
-        | **(R)** | `default` | `_DefaultT` | Fallback value. |
+        | **(R)** | `default` | `_DefaultT` | Fallback value for a non-success result. |
 
         ### Returns
-        `Union[_DataT, _DefaultT]` — The stored payload if successful, otherwise `default`.
+        `Union[_DataT, _DefaultT]` — The stored payload or `default`.
 
         ### Example
-        >>> from tbot223_base.result import Result, ResultStatus
-        >>> result: Result[dict[str, str]] = Result(status=ResultStatus.FAILURE, error="Not Found", context="FetchData", data=None)
-        >>> data = result.unwrap_or({"key": "default_value"})
-        >>> print(data)
+        >>> from tbot223_base.result import Result
+        >>> Result.failure(None, error="Not Found").unwrap_or("fallback")
+        'fallback'
         """
         if self.is_success:
             return self.data

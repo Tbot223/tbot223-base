@@ -1,6 +1,6 @@
 [한국어 (Korean)](../ko/README.md)
 
-> Contract revision: 2026-06-23.
+> Contract revision: 2026-08-12.
 
 # Contract Docs
 

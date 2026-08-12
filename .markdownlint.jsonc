@@ -1,6 +1,6 @@
 {
   // markdownlint configuration for the tbot223-base repository.
-  // The documentation contracts under docs/CONTRACT/ define an intentional
+  // The documentation contracts under docs/contracts/ define an intentional
   // house style. The two rules below conflict with that style on purpose,
   // so they are relaxed here rather than worked around in every file.
 
@@ -20,5 +20,11 @@
   // MD013 (line-length): the contracts use wide Markdown tables, inline code
   // samples, and Korean prose that intentionally exceed 80 columns; wrapping
   // them would break the tables and hurt readability.
-  "MD013": false
+  "MD013": false,
+
+  // MD024 (no-duplicate-heading): release notes intentionally repeat
+  // subsection names such as "Added" and "Changed" under different versions.
+  "MD024": {
+    "siblings_only": true
+  }
 }

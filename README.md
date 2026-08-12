@@ -1,6 +1,7 @@
 [한국어 (Korean)](README.ko.md)
 
-> Runtime baseline: package version 1.0.0 (`tbot223_base.__version__ == "1.0.0"`).
+> **Rebuilding status — `1.0.0a0`:** This repository is being rebuilt before any public release. It is not recommended for production use, and API, payload, and release guarantees may change without compatibility support. Read [Rebuilding](docs/en/rebuilding.md) before adopting it.
+> Runtime baseline: package version `1.0.0a0` (`tbot223_base.__version__ == "1.0.0a0"`).
 
 # tbot223-base
 
@@ -13,70 +14,43 @@ It provides two core pieces:
 
 ## Design Intent
 
-`tbot223-base` was shaped by Python boundary-handling needs, not by an attempt to reproduce another language's API.
+`tbot223-base` is shaped by Python boundary-handling needs, not an attempt to reproduce another language's API. `Result` is a Python-style exchange protocol: a small value shape that lets functions pass status, data, context, and error text without guessing how the caller wants to handle the outcome.
 
-Rust's `Result` can be a useful comparison point for readers, but it is not the source model or compatibility target for this package. Here, `Result` is a Python-style exchange protocol: a small value shape that lets functions pass status, data, context, and error text without guessing how the caller wants to handle the outcome.
+`ExceptionTracker` keeps rich internal diagnostics available while producing a smaller public payload that avoids traceback, local-variable, system-information, and raw-exception leakage.
 
-`ExceptionTracker` exists for safe error handling at boundaries. It does not make errors disappear; it keeps rich internal diagnostics available while producing a smaller public payload that avoids traceback, local variable, system, or raw exception leakage.
+## Current Status
+
+The prior release line was withdrawn because its type and safety contracts were ahead of their implementation. The current alpha rebuild makes `Result.data` required, removes raw reconstruction helpers, defers debug system collection, and validates documentation as executable contract material. The detailed rationale, current guarantees, and next gates are in [Rebuilding](docs/en/rebuilding.md).
 
 ## Who This Is For
 
-This package fits codebases that want:
+This package is for codebases that want a small typed result shape at function, service, worker, or module boundaries, and public-safe error payloads for APIs, UI surfaces, bot responses, or other untrusted boundaries.
 
-- a stable result shape for function, service, worker, or module boundaries.
-- a lightweight way to return success, failure, and cancellation without inventing a new dictionary shape in each layer.
-- public-safe error payloads for APIs, UI surfaces, bot responses, or other untrusted boundaries.
-- debug diagnostics that can stay richer than public responses.
-- a small typed utility package rather than a framework.
+It is not a logging, tracing, metrics, observability, pattern-matching, or monadic-result framework. It also does not replace ordinary Python exceptions inside purely local control flow.
 
-It is especially useful when an operation result is part of the interface between components, not just a local implementation detail.
+## Local Development
 
-## Trade-offs
-
-`Result` makes outcomes explicit, but that also means callers and callees must agree to pass and inspect a structured value. For very small scripts or code where normal exceptions are already the clearest control flow, this can be unnecessary ceremony.
-
-`ExceptionTracker` intentionally separates public and debug payloads. That is safer for public boundaries, but it also means public responses will not contain raw exception messages, traceback frames, local variables, or system information unless you explicitly provide safe public text.
-
-This package is not:
-
-- a Rust-compatible `Result` implementation.
-- a pattern-matching or monadic result framework.
-- a logging, tracing, metrics, or observability system.
-- a replacement for Python exceptions inside purely local control flow.
-
-## Installation
-
-```bash
-python -m pip install "tbot223-base==1.0.0"
-```
-
-For the latest stable release without pinning a version, use `python -m pip install tbot223-base`.
-
-For local development from a source checkout:
+`1.0.0a0` is not a public install target. Work from a source checkout instead.
 
 ```bash
 python -m pip install -e ".[test,type]"
+pytest -q
 ```
 
 ## Quickstart
 
-Create and inspect a result.
+Create and inspect a successful result.
 
 ```python
-from tbot223_base.result import Result, ResultStatus
+from tbot223_base.result import Result
 
-result: Result[dict[str, int]] = Result(
-    status=ResultStatus.SUCCESS,
-    error=None,
-    context="FetchProfile",
-    data={"user_id": 1},
-)
+result = Result.ok({"user_id": 1}, context="FetchProfile")
 
 if result.is_success:
     print(result.unwrap())
 ```
 
-Return a public-safe exception payload.
+Return a public-safe exception payload. This path does not collect debug system information.
 
 ```python
 from tbot223_base.exception_tracker import ExceptionTracker
@@ -98,17 +72,10 @@ except Exception as error:
 
 ## Documentation
 
-User-facing docs:
-
+- [Rebuilding status](docs/en/rebuilding.md)
 - [English docs](docs/en/README.md)
 - [Korean docs](docs/ko/README.md)
-- [Getting Started](docs/en/guides/getting-started.md)
-- [Executable examples](docs/en/guides/examples.md)
 - [Result reference](docs/en/reference/result.md)
 - [ExceptionTracker reference](docs/en/reference/exception-tracker.md)
-- [API contract](docs/contracts/en/human/api-contract.md)
-
-Repository maintenance docs:
-
 - [Package and CI guide](docs/en/guides/package-and-ci.md)
-- [Release notes](docs/en/release-notes.md)
+- [API contract](docs/contracts/en/human/api-contract.md)

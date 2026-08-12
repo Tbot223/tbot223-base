@@ -1,6 +1,6 @@
 [한국어 (Korean)](../../ko/reference/exception-tracker.md)
 
-> Runtime baseline: package version 1.0.0 (`tbot223_base.__version__ == "1.0.0"`).
+> Runtime baseline: package version `1.0.0a0` (`tbot223_base.__version__ == "1.0.0a0"`).
 
 # ExceptionTracker Reference
 
@@ -15,7 +15,7 @@ For stability rules around debug/public payload shapes, see the [API contract](.
 | Debug-heavy | `get_exception_info()`, `get_exception_return()` | Internal diagnostics where traceback and context metadata are useful. |
 | Public-safe | `get_public_exception_info()`, `get_public_exception_return()` | API responses, UI surfaces, or untrusted boundaries. |
 
-The public-safe path does not collect traceback text, local variables, params, or system information.
+The public-safe path does not collect traceback text, local variables, params, or system information. Constructing a tracker and calling `get_exception_location()` also leave the deferred system snapshot untouched.
 
 ## Public Tag Safety
 
@@ -43,7 +43,7 @@ Small primitives and primitive-only `list`/`tuple` values are copied. Top-level 
 
 ## System Info
 
-Debug payloads include system information for internal diagnostics. Environment variables are copied only when the key is a small string and the value is a small primitive or shallow tuple/list of small primitives; collection stops at `ENVIRONMENT_VARIABLE_MAX_COUNT` entries. Small environment values can still be sensitive, so mask `system_info` before exposing debug payloads outside a trusted boundary.
+Debug payloads collect one system snapshot lazily on the first debug-heavy call, then copy it into each payload; neither `started_at` nor `now` triggers another system collection. Environment variables are copied only when the key is a small string and the value is a small primitive or shallow tuple/list of small primitives; collection stops at `ENVIRONMENT_VARIABLE_MAX_COUNT` entries. Small environment values can still be sensitive, so mask `system_info` before exposing debug payloads outside a trusted boundary.
 
 ## Thread Concurrency
 

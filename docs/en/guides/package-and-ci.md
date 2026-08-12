@@ -1,149 +1,57 @@
 [한국어 (Korean)](../../ko/guides/package-and-ci.md)
 
-> Runtime baseline: package version 1.0.0 (`tbot223_base.__version__ == "1.0.0"`).
+> Runtime baseline: package version `1.0.0a0` (`tbot223_base.__version__ == "1.0.0a0"`).
 
 # Package and CI Guide
 
-This guide explains the local `pyproject.toml` setup, the Python compatibility CI workflow, and the release-only publish workflow.
+This guide covers the rebuilding alpha's local package tools, compatibility workflow, and prerelease-only publish gate. It does not authorize publication; read [Rebuilding](../rebuilding.md) first.
 
-Release, CI, Docker, and repository maintenance commands live here instead of the root README so the public package README can stay focused on users.
-
-## Local Editable Install
-
-Use editable install when you want local imports to behave like an installed package while still editing the checkout.
-
-```bash
-python -m pip install -e ".[test,type]"
-```
-
-Then run the tests.
-
-```bash
-pytest -q
-python -m mypy
-```
-
-## What `pyproject.toml` Does
-
-`pyproject.toml` is the standard package metadata entry point for modern Python tooling.
-
-In this repository it defines:
-
-- `setuptools` as the build backend.
-- package metadata such as name, README, license, authors, classifiers, project URLs, and `requires-python`.
-- dynamic package version loading from `tbot223_base.__version__`.
-- the optional `test` dependency group.
-- the optional `type` dependency group for mypy.
-- the optional `release` dependency group for build and metadata validation tools.
-- the optional `dev` dependency group for test, type, and release tooling together.
-- package discovery for `tbot223_base`.
-- inclusion of `py.typed` for type-aware tooling.
-- pytest's default `tests` path.
-- mypy's package and public consumer-check targets plus Python 3.10 typing baseline.
-
-## Local Release Tools
-
-Install the reusable release tooling from the package extras.
+## Local Development
 
 ```bash
 python -m pip install -e ".[test,type,release]"
+npm ci
+pytest -q
+python -m mypy
+python scripts/check-docstring-contract.py
+npx --no-install markdownlint-cli2 "**/*.md" "#node_modules"
 ```
 
-Then run the release readiness check.
+The package has no runtime dependencies. The `test`, `type`, and `release` extras support local verification. Markdownlint is development-only and is not part of the Python package.
+
+## Release Readiness
+
+Run the complete local gate with the exact alpha tag text.
 
 ```bash
-scripts/check-release-readiness.sh v1.0.0
+scripts/check-release-readiness.sh v1.0.0a0
 ```
 
-Use strict release mode after the `v1.0.0` tag exists locally, points at `HEAD`, the working tree is clean, and `origin/main` is available.
+Strict mode additionally requires the tag to point at `HEAD`, a clean worktree, and a locally available `origin/main`.
 
 ```bash
-scripts/check-release-readiness.sh --strict-release v1.0.0
+scripts/check-release-readiness.sh --strict-release v1.0.0a0
 ```
 
-Release gates accept stable `vMAJOR.MINOR.PATCH` tags and release-candidate `vMAJOR.MINOR.PATCHrcN` tags. After removing the leading `v`, the tag text must still exactly match `tbot223_base.__version__`.
+Accepted tags are stable `vMAJOR.MINOR.PATCH`, alpha `vMAJOR.MINOR.PATCHaN`, and release-candidate `vMAJOR.MINOR.PATCHrcN`. Their text after the leading `v` must exactly match `tbot223_base.__version__`.
 
-The script runs metadata checks, Python compile checks, `pytest`, mypy, `actionlint`, `git diff --check`, temporary source/wheel builds, `twine check`, distribution metadata assertions, and an isolated installed-wheel smoke check.
-
-For host-only use, install the `actionlint` binary separately. The Docker check already includes it.
+The script runs Python compile checks, pytest plus deterministic docstring doctests, AST docstring-contract validation, positive and negative mypy checks, Markdownlint, actionlint, diff whitespace checks, source/wheel build, `twine check`, distribution inspection, and isolated-wheel smoke tests.
 
 ## Docker Checks
 
-Use Docker when you want the same checks without depending on host Python tooling.
-
 ```bash
 docker compose run --build --rm test
-```
-
-```bash
 docker compose run --build --rm check
 ```
 
-The `test` service runs only `pytest -q`. The `check` service runs `scripts/check-release-readiness.sh v1.0.0` inside an image that installs the `test`, `type`, and `release` dependency groups and includes `actionlint`.
+The `check` image installs `actionlint` and the development-only Markdownlint CLI, then runs the complete `v1.0.0a0` readiness check.
 
 ## Compatibility CI
 
-The workflow at `.github/workflows/python-compatibility.yml` runs on push, pull request, and manual dispatch.
-
-It also supports `workflow_call` so the publish workflow can require the same compatibility matrix before uploading a package.
-
-The current matrix is:
-
-- Python 3.10
-- Python 3.11
-- Python 3.12
-- Python 3.13
-- Python 3.14
-
-Each job installs the package with test and type dependencies and runs:
-
-```bash
-pytest -q
-python -m mypy
-```
-
-## When To Run It
-
-The compatibility workflow runs automatically for push and pull request events. Use manual dispatch before release-like checkpoints, public API changes, payload contract changes, or Python support range changes.
-
-For small local-only edits, `pytest -q` in the current checkout is usually enough.
+`.github/workflows/python-compatibility.yml` runs on push, pull request, manual dispatch, and reusable-workflow invocation for Python 3.10 through 3.14. It validates pytest, public consumer typing, the intentionally invalid `Result` type fixture, the docstring contract, and Markdownlint.
 
 ## Publish Workflow
 
-The workflow at `.github/workflows/publish.yml` runs only when a GitHub Release is published.
+`.github/workflows/publish.yml` starts only when a GitHub Release is published. It requires a version-matching tag on `main`, the compatibility workflow, build and wheel checks, and PyPI Trusted Publishing.
 
-Before uploading anything, it validates:
-
-- the release has a tag.
-- the tag uses stable `vMAJOR.MINOR.PATCH` or release-candidate `vMAJOR.MINOR.PATCHrcN` format, for example `v1.0.0`.
-- release-candidate tags are published as GitHub prereleases, while stable tags are not.
-- the tag points to a commit contained in `origin/main`.
-- the tag version matches `tbot223_base.__version__` after removing the leading `v`.
-- the Python compatibility matrix passes.
-- source and wheel distributions build successfully.
-- `twine check` accepts the generated distributions.
-- the built wheel installs in an isolated environment and passes the import/public-payload smoke check.
-
-The publish job uses PyPI Trusted Publishing through GitHub OIDC. Configure the PyPI trusted publisher before publishing the first release.
-
-Use these PyPI Trusted Publisher values:
-
-- Repository owner: `Tbot223`
-- Repository name: `tbot223-base`
-- Workflow: `publish.yml`
-- Environment name: `pypi`
-
-## Release Checklist
-
-For `1.0.0`, the expected release tag is `v1.0.0`.
-
-Stable releases still use `vMAJOR.MINOR.PATCH`; release candidates use `vMAJOR.MINOR.PATCHrcN`. In both cases, use the exact package version with a leading `v`.
-
-1. Merge or fast-forward the release commit onto `main`.
-2. Confirm `tbot223_base.__version__` matches the intended release version.
-3. Run the compatibility workflow manually if you want a pre-release signal before creating the GitHub Release.
-4. Create the version tag on the `main` commit.
-5. Run `scripts/check-release-readiness.sh --strict-release v1.0.0` or `docker compose run --build --rm check --strict-release v1.0.0`.
-6. Publish a regular GitHub Release from that stable tag with the prerelease option disabled.
-
-The publish workflow will stop before PyPI upload if the tag, release type, branch ancestry, package version, tests, typing, build, installed wheel, or metadata check does not match the release contract.
+Alpha and release-candidate tags must use GitHub's prerelease option. Stable tags must not. `1.0.0a0` remains a rebuilding alpha: do not create a release or publish a distribution until the project explicitly approves that step.

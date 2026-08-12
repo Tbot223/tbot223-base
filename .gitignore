@@ -182,3 +182,4 @@ cython_debug/
 
 .DS_Store
 /.zed
+node_modules/

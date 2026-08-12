@@ -24,7 +24,7 @@ jobs:
 
           TAG_NAME="${{ github.event.release.tag_name }}"
           RELEASE_IS_PRERELEASE="${{ github.event.release.prerelease }}"
-          TAG_PATTERN='^v[0-9]+\.[0-9]+\.[0-9]+(rc[0-9]+)?$'
+          TAG_PATTERN='^v[0-9]+\.[0-9]+\.[0-9]+((a|rc)[0-9]+)?$'
 
           if [[ -z "${TAG_NAME}" ]]; then
             echo "GitHub Release must have a tag."
@@ -32,13 +32,13 @@ jobs:
           fi
 
           if [[ ! "${TAG_NAME}" =~ ${TAG_PATTERN} ]]; then
-            echo "Release tag must use stable vMAJOR.MINOR.PATCH or release-candidate vMAJOR.MINOR.PATCHrcN format, for example v1.0.0."
+            echo "Release tag must use stable vMAJOR.MINOR.PATCH, alpha vMAJOR.MINOR.PATCHaN, or release-candidate vMAJOR.MINOR.PATCHrcN format, for example v1.0.0a0."
             exit 1
           fi
 
-          if [[ "${TAG_NAME}" =~ rc[0-9]+$ ]]; then
+          if [[ "${TAG_NAME}" =~ (a|rc)[0-9]+$ ]]; then
             if [[ "${RELEASE_IS_PRERELEASE}" != "true" ]]; then
-              echo "Release-candidate tag ${TAG_NAME} must be published as a GitHub prerelease."
+              echo "Alpha and release-candidate tags such as ${TAG_NAME} must be published as GitHub prereleases."
               exit 1
             fi
           elif [[ "${RELEASE_IS_PRERELEASE}" != "false" ]]; then
@@ -106,7 +106,7 @@ jobs:
           python -m venv /tmp/tbot223-base-wheel-smoke
           /tmp/tbot223-base-wheel-smoke/bin/python -m pip install --no-deps dist/*.whl
           cd /tmp
-          /tmp/tbot223-base-wheel-smoke/bin/python -c 'import json; import tbot223_base; from tbot223_base import ExceptionTracker, Result, ResultStatus; assert Result(ResultStatus.SUCCESS, None, "WheelSmoke", 1).unwrap() == 1; payload = ExceptionTracker().get_public_exception_return(RuntimeError("internal"), tags={"nested": [1, {"safe": True}]}); json.dumps(payload.data, allow_nan=False); print(tbot223_base.__version__)'
+          /tmp/tbot223-base-wheel-smoke/bin/python -c 'import json; import tbot223_base; from tbot223_base import ExceptionTracker, Result; assert Result.ok(1, context="WheelSmoke").unwrap() == 1; payload = ExceptionTracker().get_public_exception_return(RuntimeError("internal"), tags={"nested": [1, {"safe": True}]}); json.dumps(payload.data, allow_nan=False); print(tbot223_base.__version__)'
 
       - name: Store package distributions
         uses: actions/upload-artifact@v4

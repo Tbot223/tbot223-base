@@ -4,7 +4,7 @@ set -euo pipefail
 usage() {
   cat <<'USAGE'
 Usage:
-  scripts/check-release-readiness.sh [--strict-release] [vMAJOR.MINOR.PATCH|vMAJOR.MINOR.PATCHrcN]
+  scripts/check-release-readiness.sh [--strict-release] [vMAJOR.MINOR.PATCH|vMAJOR.MINOR.PATCHaN|vMAJOR.MINOR.PATCHrcN]
 
 Checks tests, typing, package metadata, GitHub Actions workflow syntax,
 source/wheel builds, installed-wheel behavior, twine metadata validation,
@@ -12,14 +12,14 @@ and release tag/version consistency.
 
 Examples:
   scripts/check-release-readiness.sh
-  scripts/check-release-readiness.sh v1.0.0
-  scripts/check-release-readiness.sh --strict-release v1.0.0
+  scripts/check-release-readiness.sh v1.0.0a0
+  scripts/check-release-readiness.sh --strict-release v1.0.0a0
 USAGE
 }
 
 STRICT_RELEASE=0
 RELEASE_TAG=""
-RELEASE_TAG_REGEX='^v[0-9]+\.[0-9]+\.[0-9]+(rc[0-9]+)?$'
+RELEASE_TAG_REGEX='^v[0-9]+\.[0-9]+\.[0-9]+((a|rc)[0-9]+)?$'
 
 while [[ $# -gt 0 ]]; do
   case "$1" in
@@ -75,7 +75,7 @@ if [[ -z "${RELEASE_TAG}" ]]; then
 fi
 
 if [[ ! "${RELEASE_TAG}" =~ ${RELEASE_TAG_REGEX} ]]; then
-  echo "Release tag must use stable vMAJOR.MINOR.PATCH or release-candidate vMAJOR.MINOR.PATCHrcN format, for example v1.0.0." >&2
+  echo "Release tag must use stable vMAJOR.MINOR.PATCH, alpha vMAJOR.MINOR.PATCHaN, or release-candidate vMAJOR.MINOR.PATCHrcN format, for example v1.0.0a0." >&2
   exit 1
 fi
 
@@ -149,6 +149,7 @@ if git rev-parse --git-dir >/dev/null 2>&1; then
 fi
 
 require_command actionlint
+require_command npx
 require_command mypy
 
 echo "Checking Python syntax..."
@@ -160,8 +161,21 @@ python -m py_compile \
 echo "Running tests..."
 pytest -q
 
+echo "Checking deterministic public docstrings..."
+python scripts/check-docstring-contract.py
+python -m doctest tbot223_base/result.py tbot223_base/exception_tracker.py
+
 echo "Checking package typing..."
 mypy
+
+echo "Checking rejected Result API typing..."
+if mypy tests/typecheck/invalid_result_api.py; then
+  echo "The intentionally invalid Result API fixture unexpectedly passed." >&2
+  exit 1
+fi
+
+echo "Linting Markdown..."
+npx --no-install markdownlint-cli2 "**/*.md" "#node_modules"
 
 echo "Checking GitHub Actions workflows..."
 actionlint .github/workflows/*.yml
@@ -246,7 +260,7 @@ import tbot223_base
 from tbot223_base import ExceptionTracker, Result, ResultStatus
 
 assert pathlib.Path(tbot223_base.__file__).is_relative_to(pathlib.Path(sys.prefix))
-assert Result(ResultStatus.SUCCESS, None, "WheelSmoke", 1).unwrap() == 1
+assert Result.ok(1, context="WheelSmoke").unwrap() == 1
 
 public_result = ExceptionTracker().get_public_exception_return(
     RuntimeError("internal"),

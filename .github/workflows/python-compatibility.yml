@@ -33,8 +33,29 @@ jobs:
           python -m pip install --upgrade pip
           python -m pip install -e ".[test,type]"
 
+      - name: Set up Markdown linting
+        uses: actions/setup-node@v6
+        with:
+          node-version: "22"
+
+      - name: Install Markdown linting tool
+        run: npm ci
+
       - name: Run tests
         run: pytest -q
 
       - name: Check package typing
         run: python -m mypy
+
+      - name: Check rejected Result API typing
+        run: |
+          if python -m mypy tests/typecheck/invalid_result_api.py; then
+            echo "The intentionally invalid Result API fixture unexpectedly passed."
+            exit 1
+          fi
+
+      - name: Check public docstring contract
+        run: python scripts/check-docstring-contract.py
+
+      - name: Lint Markdown
+        run: npx markdownlint-cli2 "**/*.md" "#node_modules"

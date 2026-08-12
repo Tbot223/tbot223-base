@@ -1,0 +1,8 @@
+{
+  "name": "tbot223-base-development-tools",
+  "private": true,
+  "description": "Development-only tooling for the tbot223-base repository.",
+  "devDependencies": {
+    "markdownlint-cli2": "0.20.0"
+  }
+}

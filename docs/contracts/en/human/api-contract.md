@@ -1,6 +1,6 @@
 [한국어 (Korean)](../../ko/human/api-contract.md)
 
-> Contract revision: 2026-07-10.
+> Contract revision: 2026-08-12.
 
 # API Contract
 
@@ -8,7 +8,7 @@
 
 ## 1. Goal
 
-- Define the pre-release public API around Python-conventional canonical module paths.
+- Define the rebuilding alpha public API around Python-conventional canonical module paths.
 - Define `Result` as an independently shaped Python boundary exchange protocol, not as a Rust compatibility target.
 - Treat debug and public exception payloads as explicit contracts, not incidental dictionaries.
 - Preserve the safety boundary between internal diagnostics and public-facing error payloads.
@@ -51,6 +51,8 @@ Package-level exports in `tbot223_base.__init__` SHOULD expose the primary publi
 
 `ResultStatus` MUST keep the string values `success`, `failure`, and `cancelled`.
 
+`Result.data` MUST be supplied for every result state, including an intentional `None`. `Result.ok(data)`, `Result.failure(data, ...)`, and `Result.cancelled(data, ...)` are the preferred typed construction APIs. `Result` MUST retain tuple-like read behavior, but raw `_make()` and `_replace()` reconstruction helpers MUST NOT be exposed.
+
 `Result` MUST be documented as a boundary exchange shape for Python code. If Rust's `Result` is mentioned, it MUST be treated only as a comparison point, not as the source model or compatibility target.
 
 The `success=` input and `result.success` property SHOULD remain available as supported tri-state shorthand APIs until a documented breaking change removes them.
@@ -64,7 +66,7 @@ The `success=` input and `result.success` property SHOULD remain available as su
 | Debug-heavy | `get_exception_info()`, `get_exception_return()` | Trusted internal diagnostics. |
 | Public-safe | `get_public_exception_info()`, `get_public_exception_return()` | API responses, UI surfaces, and untrusted boundaries. |
 
-Debug payloads MUST include structured failure metadata, location information, copied safe context, chained causes, traceback data, and system information unless masked or unavailable.
+Debug payloads MUST include structured failure metadata, location information, copied safe context, chained causes, traceback data, and system information unless masked or unavailable. One shared system snapshot MUST be collected lazily on the first debug-heavy call and reused thereafter; public-safe methods and location lookup MUST NOT collect it.
 
 Public payloads MUST remain lightweight and MUST NOT include traceback text, traceback frames, local variables, params, user input, or system information.
 
@@ -90,7 +92,7 @@ Public tag keys MUST be normalized to bounded strings. Public tag values MUST be
 
 ## 7. Debug Safety Rules
 
-Debug context capture MUST avoid retaining raw object references.
+Debug context capture MUST avoid retaining raw object references. Mapping keys MUST be exact built-in `str` values; custom `str` subclasses MUST NOT be copied by identity.
 
 Small primitive values MAY be copied. Heavy, deep, unsupported, or custom object values MUST be replaced with `"<BLOCKED>"`.
 
@@ -106,11 +108,12 @@ Tests SHOULD cover:
 
 - Canonical import paths.
 - Package-level public exports.
-- `ResultStatus` normalization and `success=` shorthand behavior.
+- `ResultStatus` normalization, required `data`, typed factories, and rejected raw reconstruction helpers.
 - Debug payload masking and safe context capture.
 - Public payload minimal fields and absence of debug-only fields.
 - Public tag JSON serialization and absence of caller-owned object references.
 - Decorator conversion of synchronous and async uncaught exceptions into failure `Result` objects.
+- Lazy debug system collection, deterministic public docstrings, and rejected invalid consumer typing.
 
 The Python compatibility CI SHOULD run the test suite and package type check across the declared Python version matrix on push, pull request, manual dispatch, and before release-like checkpoints.
 

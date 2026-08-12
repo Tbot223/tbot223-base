@@ -65,7 +65,7 @@
 - `Constraint`는 코드에 있는 검증 로직만 반영한다.
 - 주석, 의도, 미래 계획, TODO는 `Constraint` 근거가 아니다.
 - fallback이나 자동 보정은 거절 조건이 아니므로 보통 `Note`로 간다.
-- `raise`뿐 아니라 `return Result(False, ...)` 같은 실패 경로도 제약 근거로 본다.
+- `raise`뿐 아니라 `return Result.failure(...)` 같은 실패 경로도 제약 근거로 본다.
 - 허용 패턴 밖의 자유 서술 제약은 만들지 않는다.
 
 ### 근거로 인정할 코드 패턴
@@ -76,7 +76,7 @@
 - `if workers > len(data) and not override`
 - `if chunk_size is not None and chunk_size < 0`
 - `raise ValueError(...)`, `raise TypeError(...)`, `raise KeyError(...)`
-- `return Result(False, ...)` 또는 이에 준하는 실패 반환
+- `return Result.failure(...)` 또는 이에 준하는 실패 반환
 
 ### 허용 패턴
 
@@ -113,7 +113,7 @@
 
 - `Raises`는 함수가 실제로 `raise` 하는 예외만 적는다.
 - `raise ValueError(...)`, `raise ResultUnwrapException(...)`처럼 직접 raise 하는 지점을 근거로 본다.
-- 실패를 `return Result(False, ...)`로 표현하는 경로는 `Raises`가 아니라 `Constraint`/`Returns`로 적는다.
+- 실패를 `return Result.failure(...)`로 표현하는 경로는 `Raises`가 아니라 `Constraint`/`Returns`로 적는다.
 - 호출하는 내부 함수가 raise 할 수 있어도, 현재 함수가 명시적으로 다루지 않으면 추정해서 적지 않는다.
 - 예외 타입은 백틱으로 감싸고 발생 조건을 함께 적는다.
 

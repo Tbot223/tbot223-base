@@ -1,6 +1,7 @@
 [English](README.md)
 
-> 런타임 기준: package version 1.0.0 (`tbot223_base.__version__ == "1.0.0"`).
+> **재정비 상태 — `1.0.0a0`:** 이 저장소는 공개 릴리스 전에 다시 정비 중이다. production 사용을 권장하지 않으며 API, payload, 릴리스 보장은 호환성 지원 없이 바뀔 수 있다. 도입 전 [재정비 문서](docs/ko/rebuilding.md)를 읽어야 한다.
+> 런타임 기준: package version `1.0.0a0` (`tbot223_base.__version__ == "1.0.0a0"`).
 
 # tbot223-base
 
@@ -13,70 +14,43 @@
 
 ## 설계 의도
 
-`tbot223-base`의 설계는 다른 언어의 API를 재현하려는 시도보다, Python 코드의 경계에서 결과를 안정적으로 주고받으려는 필요에서 출발했다.
+`tbot223-base`는 다른 언어 API를 재현하려는 목적이 아니라 Python 코드 경계에서 결과를 안정적으로 주고받으려는 필요에서 출발했다. `Result`는 status, data, context, error text를 전달해 caller가 결과 처리 방식을 추측하지 않게 하는 Python 스타일의 작은 교환 프로토콜이다.
 
-Rust의 `Result`는 독자가 비교할 수 있는 기준일 수 있지만, 이 패키지의 원형이나 호환 목표는 아니다. 여기서 `Result`는 Python 스타일의 교환 프로토콜이다. 함수가 결과 상태, data, context, error text를 안정적으로 전달하게 해주는 작은 값의 형태이며, caller가 결과를 어떻게 처리할지 추측하지 않게 만든다.
+`ExceptionTracker`는 내부 진단 정보는 풍부하게 유지하면서 외부에는 traceback, local variable, system information, raw exception이 새지 않는 작은 public payload를 만든다.
 
-`ExceptionTracker`는 경계에서 안전한 에러 처리를 하기 위해 존재한다. 에러를 숨기거나 무조건 터뜨리는 대신, 내부 진단 정보는 풍부하게 유지하고 외부에는 traceback, local variable, system 정보, raw exception이 새지 않는 작은 public payload를 만든다.
+## 현재 상태
+
+이전 릴리스 라인은 타입과 안전성 계약이 실제 구현보다 앞서 있어 철회했다. 현재 알파 재정비에서는 `Result.data`를 필수로 만들고 raw reconstruction helper를 제거하며 debug system collection을 지연하고 문서를 실행 가능한 계약으로 검증한다. 이유, 현재 보장, 다음 게이트는 [재정비 문서](docs/ko/rebuilding.md)에 정리한다.
 
 ## 맞는 사용자
 
-이 패키지는 다음을 원하는 코드베이스에 잘 맞는다.
+이 패키지는 함수, service, worker, module 경계에서 작은 typed result shape가 필요하고 API, UI, bot response, 기타 untrusted boundary에 노출할 public-safe error payload가 필요한 코드베이스를 위한 것이다.
 
-- 함수, service, worker, module 경계에서 사용할 안정적인 result shape.
-- 계층마다 새로운 dict 형태를 만들지 않고 success, failure, cancellation을 반환하는 가벼운 방식.
-- API, UI, bot response, 외부 경계에 노출해도 안전한 error payload.
-- Public response보다 풍부하게 유지되는 내부 debug diagnostics.
-- Framework가 아니라 작고 typed된 utility package.
+Logging, tracing, metrics, observability, pattern matching, monadic result framework이 아니며 순수 local control flow에서 일반 Python exception을 대체하지도 않는다.
 
-특히 operation result가 단순한 local implementation detail이 아니라 component 사이의 interface 일부일 때 유용하다.
+## 로컬 개발
 
-## 트레이드오프
-
-`Result`는 outcome을 명시적으로 만든다. 대신 caller와 callee가 structured value를 주고받고 확인하는 방식에 합의해야 한다. 아주 작은 script나 일반 exception 흐름이 이미 가장 명확한 코드에서는 불필요한 형식이 될 수 있다.
-
-`ExceptionTracker`는 public payload와 debug payload를 의도적으로 분리한다. Public boundary에서는 더 안전하지만, 명시적으로 안전한 public text를 넘기지 않는 한 public response에는 raw exception message, traceback frame, local variable, system information이 들어가지 않는다.
-
-이 패키지는 다음이 아니다.
-
-- Rust-compatible `Result` 구현체.
-- Pattern matching 또는 monadic result framework.
-- Logging, tracing, metrics, observability system.
-- 순수 local control flow 안에서 Python exception을 대체하는 도구.
-
-## 설치
-
-```bash
-python -m pip install "tbot223-base==1.0.0"
-```
-
-Version을 고정하지 않고 최신 stable release를 설치하려면 `python -m pip install tbot223-base`를 사용한다.
-
-Source checkout에서 local development를 할 때는 다음처럼 설치한다.
+`1.0.0a0`는 공개 설치 대상이 아니다. source checkout에서 작업한다.
 
 ```bash
 python -m pip install -e ".[test,type]"
+pytest -q
 ```
 
 ## 빠른 시작
 
-Result를 만들고 확인한다.
+성공 result를 만들고 확인한다.
 
 ```python
-from tbot223_base.result import Result, ResultStatus
+from tbot223_base.result import Result
 
-result: Result[dict[str, int]] = Result(
-    status=ResultStatus.SUCCESS,
-    error=None,
-    context="FetchProfile",
-    data={"user_id": 1},
-)
+result = Result.ok({"user_id": 1}, context="FetchProfile")
 
 if result.is_success:
     print(result.unwrap())
 ```
 
-Public-safe exception payload를 반환한다.
+Public-safe exception payload를 반환한다. 이 경로는 debug system information을 수집하지 않는다.
 
 ```python
 from tbot223_base.exception_tracker import ExceptionTracker
@@ -98,17 +72,10 @@ except Exception as error:
 
 ## 문서
 
-사용자 문서:
-
+- [재정비 상태](docs/ko/rebuilding.md)
 - [한국어 문서](docs/ko/README.md)
 - [English docs](docs/en/README.md)
-- [Getting Started](docs/ko/guides/getting-started.md)
-- [실행 가능한 예시](docs/ko/guides/examples.md)
-- [Result reference](docs/ko/reference/result.md)
-- [ExceptionTracker reference](docs/ko/reference/exception-tracker.md)
-- [API 계약](docs/contracts/ko/human/api-contract.md)
-
-Repository 관리 문서:
-
+- [Result 레퍼런스](docs/ko/reference/result.md)
+- [ExceptionTracker 레퍼런스](docs/ko/reference/exception-tracker.md)
 - [Package and CI guide](docs/ko/guides/package-and-ci.md)
-- [릴리스 노트](docs/ko/release-notes.md)
+- [API 계약](docs/contracts/ko/human/api-contract.md)

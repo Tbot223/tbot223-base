@@ -1,10 +1,10 @@
 [한국어 (Korean)](../../ko/guides/getting-started.md)
 
-> Runtime baseline: package version 1.0.0 (`tbot223_base.__version__ == "1.0.0"`).
+> Runtime baseline: package version `1.0.0a0` (`tbot223_base.__version__ == "1.0.0a0"`).
 
 # Getting Started
 
-This guide shows the smallest useful path for importing `tbot223-base` from a repository checkout or editable install.
+This guide shows the smallest useful path for the rebuilding `1.0.0a0` alpha. It is not recommended for production use; see [Rebuilding](../rebuilding.md).
 
 ## Design Intent
 
@@ -30,20 +30,15 @@ Use the canonical module paths for new code:
 ## Result Basics
 
 ```python
-from tbot223_base.result import Result, ResultStatus
+from tbot223_base.result import Result
 
-result: Result[dict[str, str]] = Result(
-    status=ResultStatus.SUCCESS,
-    error=None,
-    context="LoadConfig",
-    data={"mode": "dev"},
-)
+result: Result[dict[str, str]] = Result.ok({"mode": "dev"}, context="LoadConfig")
 
 if result.is_success:
     print(result.unwrap())
 ```
 
-Use `ResultStatus.SUCCESS`, `ResultStatus.FAILURE`, and `ResultStatus.CANCELLED` for explicit status handling. The `success=` constructor argument is also supported as tri-state shorthand.
+Use `Result.ok()`, `Result.failure()`, and `Result.cancelled()` for new code. Every result requires explicit `data`, including deliberate `None`; direct construction remains available when `ResultStatus` is required.
 
 ## Public Exception Payload
 

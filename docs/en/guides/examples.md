@@ -1,6 +1,6 @@
 [한국어 (Korean)](../../ko/guides/examples.md)
 
-> Runtime baseline: package version 1.0.0 (`tbot223_base.__version__ == "1.0.0"`).
+> Runtime baseline: package version `1.0.0a0` (`tbot223_base.__version__ == "1.0.0a0"`).
 
 # Executable Examples
 

@@ -1,6 +1,6 @@
 [한국어 (Korean)](../../ko/human/docstring-contract.md)
 
-> Contract revision: 2026-06-23.
+> Contract revision: 2026-08-12.
 
 # Docstring Contract
 
@@ -418,7 +418,7 @@ def get_exception_info(
     ...     1 / 0
     ... except ZeroDivisionError as error:
     ...     result = tracker.get_exception_info(error, mask_presets=("private", "traceback"))
-    >>> print(result.success)  # True
+    >>> print(result.success)  # False
     """
 ```
 
