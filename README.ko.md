@@ -1,7 +1,7 @@
 [English](README.md)
 
-> **재정비 상태 — `1.0.0a1`:** 이 저장소는 공개 릴리스 전에 다시 정비 중이다. production 사용을 권장하지 않으며 API, payload, 릴리스 보장은 호환성 지원 없이 바뀔 수 있다. 도입 전 [재정비 문서](docs/ko/rebuilding.md)를 읽어야 한다.
-> 런타임 기준: package version `1.0.0a1` (`tbot223_base.__version__ == "1.0.0a1"`).
+> **재정비 상태 — `1.0.0a1`:** 이 저장소는 안정 릴리스 전에 다시 정비 중이다. production 사용을 권장하지 않으며 API, payload, 릴리스 보장은 호환성 지원 없이 바뀔 수 있다. 도입 전 [재정비 문서](docs/ko/rebuilding.md)를 읽어야 한다.
+> 런타임 기준: `1.0.0a1` 기반 미배포 working tree. 이번 수정은 기존 release tag에 포함되지 않는다.
 
 # tbot223-base
 
@@ -30,7 +30,7 @@ Logging, tracing, metrics, observability, pattern matching, monadic result frame
 
 ## 로컬 개발
 
-`1.0.0a1`는 공개 설치 대상이 아니다. source checkout에서 작업한다.
+`1.0.0a1`은 alpha prerelease이며 지원되는 안정 의존성이 아니다. 미배포 경계 수정은 source checkout에서 사용한다.
 
 ```bash
 python -m pip install -e ".[test,type,lint]"

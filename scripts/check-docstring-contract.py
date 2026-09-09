@@ -41,7 +41,7 @@ PUBLIC_METHODS = {
             "get_public_exception_return",
             "get_error_code",
         },
-        "ExceptionTrackerDecorator": {"__init__"},
+        "ExceptionTrackerDecorator": {"__init__", "wrap_awaitable"},
     },
 }
 REQUIRED_SECTIONS = ("### Arguments", "### Returns")

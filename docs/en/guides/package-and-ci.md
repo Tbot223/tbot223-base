@@ -1,6 +1,6 @@
 [한국어 (Korean)](../../ko/guides/package-and-ci.md)
 
-> Runtime baseline: package version `1.0.0a1` (`tbot223_base.__version__ == "1.0.0a1"`).
+> Runtime baseline: unreleased working tree based on `1.0.0a1`; these fixes are not part of the existing release tag.
 
 # Package and CI Guide
 
@@ -13,6 +13,7 @@ python -m pip install -e ".[test,type,lint,release]"
 npm ci
 pytest -q
 python -m mypy
+python scripts/check-rejected-types.py
 python -m ruff check .
 python -m ruff format --check .
 python scripts/check-docstring-contract.py
@@ -50,10 +51,14 @@ The `check` image installs `actionlint`, Ruff, and the development-only Markdown
 
 ## Compatibility CI
 
-`.github/workflows/python-compatibility.yml` runs on push, pull request, manual dispatch, and reusable-workflow invocation for Python 3.10 through 3.14. It validates pytest, public consumer typing, the intentionally invalid `Result` type fixture, Ruff linting and formatting, the docstring contract, and Markdownlint.
+`.github/workflows/python-compatibility.yml` runs on push, pull request, manual dispatch, and reusable-workflow invocation for Python 3.10 through 3.14. It validates pytest, public consumer typing, each annotated invalid consumer line and expected mypy error code, Ruff linting and formatting, the docstring contract, and Markdownlint. Ubuntu runs Python 3.10–3.14; Windows and macOS additionally run Python 3.12. A separate required workflow job runs actionlint.
 
 ## Publish Workflow
 
 `.github/workflows/publish.yml` starts only when a GitHub Release is published. It requires a version-matching tag on `main`, the compatibility workflow, build and wheel checks, and PyPI Trusted Publishing.
 
 Alpha and release-candidate tags must use GitHub's prerelease option. Stable tags must not. `1.0.0a1` remains a rebuilding alpha: do not create a release or publish a distribution until the project explicitly approves that step.
+
+## Source Archive Verification
+
+The sdist includes Python validation scripts, Node manifests and lockfile, Markdownlint configuration, and workflow files. After installing the documented development tools and running `npm ci`, its non-strict readiness script can run without Git metadata. Strict mode requires a real Git checkout, the matching tag, and a clean worktree; a source archive cannot establish release provenance.

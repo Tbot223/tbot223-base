@@ -1,6 +1,6 @@
 [한국어 (Korean)](../../ko/llm/api-contract.md)
 
-> Contract revision: 2026-08-12.
+> Contract revision: 2026-09-09 (unreleased boundary fixes).
 
 # API Contract for LLM
 
@@ -35,6 +35,7 @@ API-sensitive changes should run:
 ```bash
 pytest -q
 python -m mypy
+python scripts/check-rejected-types.py
 python -m ruff check .
 python -m ruff format --check .
 python scripts/check-docstring-contract.py

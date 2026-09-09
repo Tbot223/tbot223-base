@@ -1,5 +1,7 @@
 include README.ko.md
+include package.json package-lock.json .markdownlint.jsonc
+recursive-include .github/workflows *.yml
 recursive-include docs *.md
 recursive-include examples *.py
-recursive-include scripts *.sh
+recursive-include scripts *.sh *.py
 recursive-include tests *.py

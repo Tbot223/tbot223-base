@@ -11,12 +11,18 @@ permissions:
 
 jobs:
   test:
-    name: Python ${{ matrix.python-version }}
-    runs-on: ubuntu-latest
+    name: Python ${{ matrix.python-version }} / ${{ matrix.os }}
+    runs-on: ${{ matrix.os }}
     strategy:
       fail-fast: false
       matrix:
+        os: [ubuntu-latest]
         python-version: ["3.10", "3.11", "3.12", "3.13", "3.14"]
+        include:
+          - os: windows-latest
+            python-version: "3.12"
+          - os: macos-latest
+            python-version: "3.12"
 
     steps:
       - name: Check out repository
@@ -52,15 +58,19 @@ jobs:
           python -m ruff check .
           python -m ruff format --check .
 
-      - name: Check rejected Result API typing
-        run: |
-          if python -m mypy tests/typecheck/invalid_result_api.py; then
-            echo "The intentionally invalid Result API fixture unexpectedly passed."
-            exit 1
-          fi
+      - name: Check each rejected consumer typing case
+        run: python scripts/check-rejected-types.py
 
       - name: Check public docstring contract
         run: python scripts/check-docstring-contract.py
 
       - name: Lint Markdown
         run: npx markdownlint-cli2 "**/*.md" "#node_modules"
+
+  workflow-lint:
+    name: GitHub Actions syntax
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v6
+      - name: Run actionlint
+        run: docker run --rm -v "$PWD:/repo" -w /repo rhysd/actionlint:1.7.7 -color

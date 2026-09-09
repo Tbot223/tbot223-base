@@ -1,6 +1,6 @@
 [한국어 (Korean)](../../ko/reference/result.md)
 
-> Runtime baseline: package version `1.0.0a1` (`tbot223_base.__version__ == "1.0.0a1"`).
+> Runtime baseline: unreleased working tree based on `1.0.0a1`; these fixes are not part of the existing release tag.
 
 # Result Reference
 
@@ -56,3 +56,9 @@ The `success=` input and `result.success` property remain tri-state shorthand du
 ## Import Path
 
 Import `Result`, `ResultStatus`, and `ResultUnwrapException` from `tbot223_base.result`.
+
+## Copying and Static Types
+
+`copy.copy`, `copy.deepcopy`, and standard pickle round trips preserve the result fields when the payload supports those operations. Shallow copies share the payload; deep copies copy it. Reconstruction still requires explicit data and does not restore `_make` or `_replace`.
+
+The fixed tuple type preserves field types through literal indexing (including negative indexes) and unpacking. Dynamic indexes and slices have normal tuple typing. The container is immutable; payload mutability is unchanged.

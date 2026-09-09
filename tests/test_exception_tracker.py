@@ -864,7 +864,7 @@ def test_get_exception_info_and_return_fallbacks(monkeypatch):
     info_result = tracker.get_exception_info(RuntimeError("boom"))
 
     assert info_result.status is ResultStatus.FAILURE
-    assert "RuntimeError" in info_result.error
+    assert info_result.data == {"tracker_failure": True, "message": info_result.error}
     assert info_result.context == "Core.ExceptionTracker.get_exception_info, L1"
 
     def broken_exception_info(*args, **kwargs):
@@ -874,7 +874,10 @@ def test_get_exception_info_and_return_fallbacks(monkeypatch):
     return_result = tracker.get_exception_return(RuntimeError("boom"))
 
     assert return_result.status is ResultStatus.FAILURE
-    assert "RuntimeError" in return_result.error
+    assert return_result.data == {
+        "tracker_failure": True,
+        "message": return_result.error,
+    }
     assert return_result.context == "Core.ExceptionTracker.get_exception_return, L2"
 
 
@@ -888,7 +891,7 @@ def test_get_exception_location_fallback(monkeypatch):
     result = tracker.get_exception_location(RuntimeError("boom"))
 
     assert result.status is ResultStatus.FAILURE
-    assert "RuntimeError" in result.error
+    assert result.error == "ExceptionTracker could not collect exception information."
     assert result.context == "Core.ExceptionTracker.get_exception_location, L1"
 
 

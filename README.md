@@ -1,7 +1,7 @@
 [한국어 (Korean)](README.ko.md)
 
-> **Rebuilding status — `1.0.0a1`:** This repository is being rebuilt before any public release. It is not recommended for production use, and API, payload, and release guarantees may change without compatibility support. Read [Rebuilding](docs/en/rebuilding.md) before adopting it.
-> Runtime baseline: package version `1.0.0a1` (`tbot223_base.__version__ == "1.0.0a1"`).
+> **Rebuilding status — `1.0.0a1`:** This repository is being rebuilt before a stable release. It is not recommended for production use, and API, payload, and release guarantees may change without compatibility support. Read [Rebuilding](docs/en/rebuilding.md) before adopting it.
+> Runtime baseline: unreleased working tree based on `1.0.0a1`; these fixes are not part of the existing release tag.
 
 # tbot223-base
 
@@ -30,7 +30,7 @@ It is not a logging, tracing, metrics, observability, pattern-matching, or monad
 
 ## Local Development
 
-`1.0.0a1` is not a public install target. Work from a source checkout instead.
+`1.0.0a1` is an alpha prerelease, not a supported stable dependency. Work from a source checkout to use the unreleased boundary fixes.
 
 ```bash
 python -m pip install -e ".[test,type,lint]"

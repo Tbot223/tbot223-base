@@ -405,7 +405,7 @@ def get_exception_info(
     > - Heavy or unsupported context values are replaced with `"<BLOCKED>"` rather than summarized with metadata.
     > - Small copied context values, `traceback`, and `system_info` may still contain sensitive data.
     > - Environment variables inside `system_info` are copied only when they are small primitives or shallow tuple/list values with small primitive items.
-    > - Apply `mask_presets=("private", "traceback", "system_info")` before exposing error information outside a trusted boundary.
+    > - Use `get_public_exception_info()` for external responses. Masked debug payloads can still contain sensitive messages and locations.
 
     ### Note
     > Context capture preserves small primitives and primitive-only `list`/`tuple` values; `dict` values are copied only at the top level.

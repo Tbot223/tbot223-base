@@ -1,6 +1,6 @@
 [English](../../en/reference/result.md)
 
-> 런타임 기준: package version `1.0.0a1` (`tbot223_base.__version__ == "1.0.0a1"`).
+> 런타임 기준: `1.0.0a1` 기반 미배포 working tree. 이번 수정은 기존 release tag에 포함되지 않는다.
 
 # Result 레퍼런스
 
@@ -56,3 +56,9 @@ result: Result[int] = Result(ResultStatus.SUCCESS, None, "Compute", 42)
 ## Import 경로
 
 `Result`, `ResultStatus`, `ResultUnwrapException`은 `tbot223_base.result`에서 import한다.
+
+## 복사와 정적 타입
+
+Payload가 해당 연산을 지원하면 `copy.copy`, `copy.deepcopy`, 표준 pickle 왕복은 result field를 유지한다. 얕은 복사는 payload를 공유하고 깊은 복사는 payload도 복사한다. 복원 과정도 명시적 data를 요구하며 `_make`, `_replace`를 다시 제공하지 않는다.
+
+고정 tuple 타입은 음수 index를 포함한 literal indexing과 unpacking에서 각 field 타입을 유지한다. 동적 index와 slice에는 일반 tuple typing 규칙을 적용한다. Container는 immutable이며 payload 자체의 mutability는 바뀌지 않는다.
