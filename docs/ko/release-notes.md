@@ -2,6 +2,24 @@
 
 # 릴리스 노트
 
+## 미배포 — 경계 계약 수정
+
+이 변경은 `1.0.0a1` 이후 개발 tree에 적용하며 기존 release tag는 바뀌지 않는다.
+
+### 수정
+
+- Public 정수와 정규화 key를 제한하고 전역 tag 순회 예산을 공유한다.
+- Result copy, deepcopy, pickle과 tuple 접근 field 타입을 보존한다.
+- 자동 decorator 타입에 즉시 실패 Result를 포함한다. 항상 coroutine을 반환해야 할 때는 `wrap_awaitable()`을 사용하며 원래 factory 호출은 await 시점으로 지연한다.
+- Debug fallback에는 식별 가능한 고정 data만 반환하고 원본 traceback·예외 문구와 출력 의존성을 제거한다.
+- 외부 노출 안내를 masked debug result 대신 public method를 사용하도록 정정한다.
+
+### 검증
+
+- Consumer 경계 회귀 테스트를 추가하고 주석으로 지정한 모든 음성 mypy diagnostic을 각각 확인한다.
+- 최종 public payload field 타입을 구체화하고 Ubuntu Python 3.10–3.14 외에 Windows/macOS Python 3.12와 actionlint 검사를 추가한다.
+- Non-strict readiness의 모든 script·설정을 sdist에 포함하고 Git metadata 없는 strict mode를 거부한다.
+
 ## 1.0.0a1 — lint 기준
 
 `1.0.0a1`은 `1.0.0a0` 이후 재정비 alpha를 이어간다. 새 runtime API나 stable compatibility 보장을 추가하지 않는다.

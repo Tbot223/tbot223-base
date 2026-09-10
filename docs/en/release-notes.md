@@ -2,6 +2,24 @@
 
 # Release Notes
 
+## Unreleased — boundary contract fixes
+
+These changes apply to the development tree after `1.0.0a1`; the existing release tag is unchanged.
+
+### Fixed
+
+- Bound public integers and normalized keys; share a global tag traversal budget.
+- Preserve Result copy, deepcopy, pickle, and tuple-access field types.
+- Tighten automatic decorator typing to include immediate failure results; use `wrap_awaitable()` for an always-coroutine interface. Calling the original factory is deferred until await.
+- Return fixed, recognizable debug fallback data without original traceback or exception text; remove fallback output dependencies.
+- Correct external-exposure guidance to use public methods rather than masked debug results.
+
+### Validation
+
+- Add consumer boundary regressions and require every marked negative mypy diagnostic.
+- Tighten final public payload field types and add Windows/macOS Python 3.12 checks alongside Ubuntu Python 3.10–3.14 and actionlint.
+- Include all non-strict readiness scripts and configurations in sdist; reject strict mode without Git metadata.
+
 ## 1.0.0a1 — lint baseline
 
 `1.0.0a1` continues the rebuilding alpha after `1.0.0a0`. It does not add a new runtime API or stable compatibility promise.

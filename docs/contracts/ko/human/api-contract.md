@@ -1,6 +1,6 @@
 [English](../../en/human/api-contract.md)
 
-> Contract revision: 2026-08-12.
+> Contract revision: 2026-09-09 (unreleased boundary fixes).
 
 # API Contract
 
@@ -57,6 +57,8 @@ Public code는 다음 canonical path를 MUST 사용한다.
 
 `success=` 입력과 `result.success` property는 문서화된 breaking change로 제거되기 전까지 지원되는 tri-state shorthand API로 SHOULD 유지한다.
 
+Payload가 연산을 지원하면 표준 copy/deepcopy와 pickle 복원은 검증된 result field를 MUST 유지한다. Literal tuple indexing과 unpacking은 각 field 타입을 MUST 유지한다.
+
 ## 5. Exception Payload 계약
 
 `ExceptionTracker`는 두 payload path를 가진다.
@@ -90,6 +92,12 @@ Public tag key는 bounded string으로 MUST 정규화한다. Public tag value는
 
 `ExceptionTrackerDecorator`는 synchronous function, coroutine function, awaited result에서 발생한 uncaught exception을 failure `Result`로 MUST 변환한다. 이후 generator 또는 async-generator iteration 중 발생한 exception은 이 decorator 계약의 범위 밖이다.
 
+자동 wrapper는 awaitable을 반환하는 callable이 즉시 `Result`를 반환할 가능성을 정적 반환 타입에 MUST 표시한다. `wrap_awaitable()`은 항상 coroutine을 반환하고 지연된 함수 호출과 await 양쪽의 실패를 MUST 변환한다. Cancellation과 다른 `BaseException` subclass는 MUST 전파한다.
+
+Public 정수는 절댓값 기준 512 bit까지만 MUST 허용한다. 문자열 error code와 정규화된 모든 tag key는 200자 이하로 MUST 제한한다. 미지원 key는 제거하고, 초과한 tag value는 차단하고, 잘못되거나 초과한 error code는 기본 code로 MUST 대체한다. Public tag 복사는 nested value와 반복 참조 전체에 256-value 순회 예산을 MUST 공유하며, 남은 예산으로 완성하지 못하는 collection은 `"<BLOCKED>"`로 MUST 대체한다.
+
+최종 public field 타입은 실제 payload에 MUST 일치한다. 식별자와 메시지는 string, status는 `Literal["failure"]`, success는 `Literal[False]`이며 retryable만 nullable이다.
+
 ## 7. Debug Safety Rules
 
 Debug context capture는 raw object reference를 보존하지 않아야 한다. Mapping key는 exact built-in `str`이어야 하며 custom `str` subclass를 identity로 복사해서는 안 된다.
@@ -99,6 +107,8 @@ Debug context capture는 raw object reference를 보존하지 않아야 한다. 
 Mask preset과 명시적 mask path는 context capture 이후에 MUST 적용한다.
 
 기본 debug path는 `input_context.local_variables`를 SHOULD mask한다.
+
+Mask preset을 debug payload 전체의 public 노출 안전성 보장으로 설명해서는 안 된다. 외부 응답은 public 경로를 MUST 사용한다. Debug 수집 또는 masking이 실패하면 fallback data dictionary에는 `tracker_failure=True`와 고정 일반 메시지만 MUST 포함하며 원본 예외, 입력, traceback은 제외한다. Fallback은 stdout·stderr 쓰기에 의존해서는 안 된다.
 
 ## 8. Validation Rules
 
@@ -116,6 +126,8 @@ Mask preset과 명시적 mask path는 context capture 이후에 MUST 적용한�
 - Lazy debug system collection, deterministic public docstring, 거부되는 invalid consumer typing.
 
 Python compatibility CI는 push, pull request, manual dispatch, release-like checkpoint 전에 선언된 Python version matrix에서 test suite와 package type check를 SHOULD 실행한다.
+
+음성 consumer type gate는 mypy 종료 코드만 확인하지 않고 주석으로 지정한 각 line의 예상 diagnostic을 MUST 검증한다. Source distribution은 non-strict readiness에 필요한 script와 설정을 MUST 포함한다. Strict release mode는 Git metadata가 없는 source archive를 MUST 거부한다.
 
 ## 9. 최종 체크리스트
 

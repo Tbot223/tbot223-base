@@ -1,6 +1,6 @@
 [한국어 (Korean)](../ko/rebuilding.md)
 
-> Runtime baseline: package version `1.0.0a1` (`tbot223_base.__version__ == "1.0.0a1"`).
+> Runtime baseline: unreleased working tree based on `1.0.0a1`; these fixes are not part of the existing release tag.
 
 # Rebuilding `tbot223-base`
 
@@ -21,6 +21,8 @@
 - Public exception paths do not collect traceback, local context, or system information. Debug system snapshots begin only on the first debug-heavy call.
 - Debug context copies accept exact built-in string keys only and do not retain custom `str` key objects.
 
+The unreleased boundary fixes add Result copy/pickle support and precise tuple typing, bounded public integers and a global tag traversal budget, concrete public field types, fail-closed debug fallback, and an explicit `wrap_awaitable()` decorator path. See the references and unreleased notes for migration details.
+
 ## Rebuilding Principles
 
 1. Make runtime behavior, static types, documentation, and examples describe the same contract.
@@ -38,4 +40,4 @@
 
 ## Deferred Work
 
-The alpha rebuild does not yet promise a final public payload `TypedDict`, a policy for suppressed exception context, a global public-tag budget, immutable supply-chain pinning, SBOM/provenance artifacts, or stable release compatibility. These remain follow-up decisions, not hidden behavior guarantees.
+The alpha rebuild does not yet promise a stable long-term payload schema or a policy for suppressed exception context, immutable supply-chain pinning, SBOM/provenance artifacts, or stable release compatibility. These remain follow-up decisions, not hidden behavior guarantees.

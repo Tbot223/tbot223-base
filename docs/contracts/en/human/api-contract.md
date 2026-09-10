@@ -1,6 +1,6 @@
 [한국어 (Korean)](../../ko/human/api-contract.md)
 
-> Contract revision: 2026-08-12.
+> Contract revision: 2026-09-09 (unreleased boundary fixes).
 
 # API Contract
 
@@ -57,6 +57,8 @@ Package-level exports in `tbot223_base.__init__` SHOULD expose the primary publi
 
 The `success=` input and `result.success` property SHOULD remain available as supported tri-state shorthand APIs until a documented breaking change removes them.
 
+Standard copy/deepcopy and pickle reconstruction MUST retain the validated result fields when the payload supports them. Literal tuple indexing and unpacking MUST preserve field types.
+
 ## 5. Exception Payload Contract
 
 `ExceptionTracker` has two payload paths.
@@ -90,6 +92,12 @@ Public tag keys MUST be normalized to bounded strings. Public tag values MUST be
 
 `ExceptionTrackerDecorator` MUST convert uncaught exceptions from synchronous functions, coroutine functions, and awaited results into failure `Result` objects. Exceptions raised during later generator or async-generator iteration are outside this decorator contract.
 
+For automatic wrapping, awaitable-returning callables MUST expose the possibility of an immediate `Result` in their static return type. `wrap_awaitable()` MUST always return a coroutine and convert failures from both the deferred function call and its await. Cancellation and other `BaseException` subclasses MUST propagate.
+
+Public integers MUST have at most 512 magnitude bits. String error codes and all normalized tag keys MUST have at most 200 characters. Unsupported keys MUST be dropped; oversized tag values MUST be blocked; invalid or oversized error codes MUST use the default code. Public tag copying MUST share a 256-value traversal budget across nested values and repeated references. Collections that cannot complete within the budget MUST become `"<BLOCKED>"`.
+
+Final public field types MUST match the concrete payload: identifiers and messages are strings, status is `Literal["failure"]`, success is `Literal[False]`, and only retryable is nullable.
+
 ## 7. Debug Safety Rules
 
 Debug context capture MUST avoid retaining raw object references. Mapping keys MUST be exact built-in `str` values; custom `str` subclasses MUST NOT be copied by identity.
@@ -99,6 +107,8 @@ Small primitive values MAY be copied. Heavy, deep, unsupported, or custom object
 Mask presets and explicit mask paths MUST be applied after context capture.
 
 The default debug path SHOULD mask `input_context.local_variables`.
+
+Mask presets MUST NOT be documented as a guarantee that debug payloads are safe for public exposure. External responses MUST use the public path. If debug capture or masking fails, the fallback MUST contain only `tracker_failure=True` and a fixed generic message in its data dictionary, without original exceptions, input, or traceback. Fallback paths MUST NOT depend on writing to stdout or stderr.
 
 ## 8. Validation Rules
 
@@ -116,6 +126,8 @@ Tests SHOULD cover:
 - Lazy debug system collection, deterministic public docstrings, and rejected invalid consumer typing.
 
 The Python compatibility CI SHOULD run the test suite and package type check across the declared Python version matrix on push, pull request, manual dispatch, and before release-like checkpoints.
+
+The negative consumer type gate MUST verify the expected diagnostic at every annotated line, not merely a nonzero mypy exit status. The source distribution MUST include the scripts and configurations needed by its non-strict readiness check. Strict release mode MUST reject a source archive without Git metadata.
 
 ## 9. Final Checklist
 

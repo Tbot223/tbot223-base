@@ -1,6 +1,6 @@
 [English](../en/rebuilding.md)
 
-> 런타임 기준: package version `1.0.0a1` (`tbot223_base.__version__ == "1.0.0a1"`).
+> 런타임 기준: `1.0.0a1` 기반 미배포 working tree. 이번 수정은 기존 release tag에 포함되지 않는다.
 
 # `tbot223-base` 재정비
 
@@ -21,6 +21,8 @@
 - Public exception 경로는 traceback, local context, system information을 수집하지 않는다. Debug system snapshot은 첫 debug-heavy 호출에서만 시작한다.
 - Debug context copy는 exact built-in string key만 허용하며 custom `str` key object를 보존하지 않는다.
 
+미배포 경계 수정에는 Result copy/pickle 지원과 정확한 tuple typing, public 정수 제한과 전역 tag 순회 예산, 구체화된 public field 타입, 원본 진단 정보를 제거한 debug fallback, 명시적인 `wrap_awaitable()` decorator 경로가 포함된다. 변경된 사용법은 reference와 미배포 변경 기록을 참고한다.
+
 ## 재정비 원칙
 
 1. 런타임 동작, static type, 문서, 예제가 같은 계약을 설명하게 한다.
@@ -38,4 +40,4 @@
 
 ## 보류한 작업
 
-이번 alpha 재정비는 final public payload `TypedDict`, suppressed exception context 정책, public tag 전역 budget, immutable supply-chain pinning, SBOM/provenance artifact, stable release compatibility를 아직 보장하지 않는다. 이 항목들은 숨은 동작이 아니라 별도 후속 결정으로 남긴다.
+이번 alpha 재정비는 장기적으로 안정적인 payload schema, suppressed exception context 정책, immutable supply-chain pinning, SBOM/provenance artifact, stable release compatibility를 아직 보장하지 않는다. 이 항목들은 숨은 동작이 아니라 별도 후속 결정으로 남긴다.

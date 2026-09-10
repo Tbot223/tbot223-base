@@ -113,7 +113,7 @@ print(f"metadata baseline ok: {project['name']} {__version__}")
 PY
 
 echo "Checking local release tag state..."
-if git rev-parse --git-dir >/dev/null 2>&1; then
+if [[ -e .git ]] && git rev-parse --git-dir >/dev/null 2>&1; then
   if git rev-parse -q --verify "refs/tags/${RELEASE_TAG}^{commit}" >/dev/null; then
     TAG_COMMIT="$(git rev-list -n 1 "${RELEASE_TAG}")"
 
@@ -147,6 +147,9 @@ if git rev-parse --git-dir >/dev/null 2>&1; then
       exit 1
     fi
   fi
+elif [[ "${STRICT_RELEASE}" -eq 1 ]]; then
+  echo "Strict release mode requires a Git checkout." >&2
+  exit 1
 fi
 
 require_command actionlint
@@ -175,10 +178,7 @@ ruff check .
 ruff format --check .
 
 echo "Checking rejected Result API typing..."
-if mypy tests/typecheck/invalid_result_api.py; then
-  echo "The intentionally invalid Result API fixture unexpectedly passed." >&2
-  exit 1
-fi
+python scripts/check-rejected-types.py
 
 echo "Linting Markdown..."
 npx --no-install markdownlint-cli2 "**/*.md" "#node_modules"
@@ -187,7 +187,11 @@ echo "Checking GitHub Actions workflows..."
 actionlint .github/workflows/*.yml
 
 echo "Checking whitespace in git diff..."
-git diff --check
+if [[ -e .git ]]; then
+  git diff --check
+else
+  echo "Source archive has no Git metadata; skipping diff whitespace check."
+fi
 
 echo "Building package in a temporary copy..."
 TMP_DIR="$(mktemp -d /tmp/tbot223-base-release-check.XXXXXX)"
@@ -237,6 +241,13 @@ with tarfile.open(sdists[0]) as sdist:
         "docs/en/README.md",
         "examples/result/result_status_flow.py",
         "scripts/check-release-readiness.sh",
+        "scripts/check-docstring-contract.py",
+        "scripts/check-rejected-types.py",
+        "package.json",
+        "package-lock.json",
+        ".markdownlint.jsonc",
+        ".github/workflows/python-compatibility.yml",
+        ".github/workflows/publish.yml",
         "tests/conftest.py",
         "tests/typecheck/public_api.py",
     ):

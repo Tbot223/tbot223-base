@@ -82,7 +82,9 @@ class ResultUnwrapException(RuntimeError):
         self.data = data
 
 
-class Result(tuple, Generic[_DataT]):
+class Result(
+    tuple[ResultStatus, Optional[str], Optional[str], _DataT], Generic[_DataT]
+):
     """
     Represent an immutable tuple-like operation outcome with explicit payload data.
 
@@ -197,6 +199,12 @@ class Result(tuple, Generic[_DataT]):
             "Result[_DataT]",
             tuple.__new__(cls, (normalized_status, error, context, data)),
         )
+
+    def __getnewargs__(
+        self,
+    ) -> tuple[ResultStatus, Optional[str], Optional[str], _DataT]:
+        """Preserve validated constructor arguments for copy and pickle."""
+        return self.status, self.error, self.context, self.data
 
     @classmethod
     def ok(

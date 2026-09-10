@@ -16,6 +16,7 @@ from typing import (
     Any,
     Awaitable,
     Callable,
+    Coroutine,
     Dict,
     List,
     Literal,
@@ -57,15 +58,15 @@ ContextMapping: TypeAlias = Dict[object, object]
 
 
 class PublicErrorDetail(TypedDict):
-    code: Optional[PublicErrorCode]
-    message: Optional[str]
+    code: PublicErrorCode
+    message: str
 
 
 class PublicErrorInfo(TypedDict):
-    id: Optional[str]
-    status: Optional[str]
-    success: Optional[bool]
-    timestamp: Optional[str]
+    id: str
+    status: Literal["failure"]
+    success: Literal[False]
+    timestamp: str
     error: PublicErrorDetail
     tags: Dict[str, PublicTagValue]
     retryable: Optional[bool]
@@ -303,6 +304,8 @@ class ExceptionTracker:
     CONTEXT_MAX_VALUE_LENGTH = 200
     CONTEXT_MAX_ITEMS = 20
     PUBLIC_TAG_MAX_DEPTH = 3
+    PUBLIC_MAX_INTEGER_BITS = 512
+    PUBLIC_TAG_MAX_NODES = 256
     MASK_PRESETS: Mapping[MaskPreset, Tuple[Tuple[str, ...], ...]] = MappingProxyType(
         {
             "default": (("input_context", "local_variables"),),
@@ -401,11 +404,22 @@ class ExceptionTracker:
         """Return a bounded JSON object key for a public tag."""
         if type(key) is str:
             return key if len(key) <= cls.CONTEXT_MAX_VALUE_LENGTH else None
+        if (
+            type(key) is int
+            and cast(int, key).bit_length() > cls.PUBLIC_MAX_INTEGER_BITS
+        ):
+            return None
         if type(key) in (bool, int) or key is None:
-            return str(key)
-        if type(key) is float and math.isfinite(cast(float, key)):
-            return str(key)
-        return None
+            normalized_key = str(key)
+        elif type(key) is float and math.isfinite(cast(float, key)):
+            normalized_key = str(key)
+        else:
+            return None
+        return (
+            normalized_key
+            if len(normalized_key) <= cls.CONTEXT_MAX_VALUE_LENGTH
+            else None
+        )
 
     @classmethod
     def _copy_public_tag_value(
@@ -414,10 +428,21 @@ class ExceptionTracker:
         *,
         depth: int = 0,
         seen: Optional[set[int]] = None,
+        budget: Optional[List[int]] = None,
     ) -> PublicTagValue:
         """Return a bounded JSON-safe copy of a public tag value."""
-        if value is None or type(value) in (bool, int):
+        remaining = [cls.PUBLIC_TAG_MAX_NODES] if budget is None else budget
+        if remaining[0] <= 0:
+            return cls.BLOCKED_VALUE
+        remaining[0] -= 1
+        if value is None or type(value) is bool:
             return cast(PublicTagValue, value)
+        if type(value) is int:
+            return (
+                value
+                if value.bit_length() <= cls.PUBLIC_MAX_INTEGER_BITS
+                else cls.BLOCKED_VALUE
+            )
         if type(value) is float:
             return value if math.isfinite(cast(float, value)) else cls.BLOCKED_VALUE
         if type(value) is str:
@@ -437,25 +462,33 @@ class ExceptionTracker:
 
         if type(value) in (list, tuple):
             sequence = cast(Union[List[object], Tuple[object, ...]], value)
-            if len(sequence) > cls.CONTEXT_MAX_ITEMS:
+            if len(sequence) > cls.CONTEXT_MAX_ITEMS or len(sequence) > remaining[0]:
                 return cls.BLOCKED_VALUE
             active_ids.add(value_id)
             try:
-                return [
-                    cls._copy_public_tag_value(item, depth=depth + 1, seen=active_ids)
-                    for item in sequence
-                ]
+                copied_sequence: List[PublicTagValue] = []
+                for item in sequence:
+                    if remaining[0] <= 0:
+                        return cls.BLOCKED_VALUE
+                    copied_sequence.append(
+                        cls._copy_public_tag_value(
+                            item, depth=depth + 1, seen=active_ids, budget=remaining
+                        )
+                    )
+                return copied_sequence
             finally:
                 active_ids.remove(value_id)
 
         if type(value) is dict:
             mapping = cast(Dict[object, object], value)
-            if len(mapping) > cls.CONTEXT_MAX_ITEMS:
+            if len(mapping) > cls.CONTEXT_MAX_ITEMS or len(mapping) > remaining[0]:
                 return cls.BLOCKED_VALUE
             active_ids.add(value_id)
             try:
                 copied_mapping: Dict[str, PublicTagValue] = {}
                 for key, item in mapping.items():
+                    if remaining[0] <= 0:
+                        return cls.BLOCKED_VALUE
                     normalized_key = cls._normalize_public_tag_key(key)
                     if normalized_key is None:
                         continue
@@ -463,6 +496,7 @@ class ExceptionTracker:
                         item,
                         depth=depth + 1,
                         seen=active_ids,
+                        budget=remaining,
                     )
                 return copied_mapping
             finally:
@@ -477,13 +511,16 @@ class ExceptionTracker:
             return {}
 
         copied_tags: Dict[str, PublicTagValue] = {}
+        budget = [cls.PUBLIC_TAG_MAX_NODES]
         for index, (key, value) in enumerate(tags.items()):
             if index >= cls.CONTEXT_MAX_ITEMS:
                 break
             normalized_key = cls._normalize_public_tag_key(key)
             if normalized_key is None:
                 continue
-            copied_tags[normalized_key] = cls._copy_public_tag_value(value)
+            copied_tags[normalized_key] = cls._copy_public_tag_value(
+                value, budget=budget
+            )
         return copied_tags
 
     @classmethod
@@ -505,14 +542,21 @@ class ExceptionTracker:
 
     @staticmethod
     def _build_handler_failure_payload(error: Exception) -> Tuple[str, str]:
-        """Build fallback error text when exception tracking itself fails."""
-        print(
-            "An error occurred while handling another exception. This may indicate a critical issue."
+        """Return fixed fallback text without inspecting exceptions or writing output."""
+        return (
+            "ExceptionTracker could not collect exception information.",
+            "<unavailable>",
         )
-        traceback_text = "".join(
-            traceback.format_exception(type(error), error, error.__traceback__)
+
+    @staticmethod
+    def _build_debug_fallback(context: str) -> Result[Dict[str, object]]:
+        """Fail closed with a recognizable payload and no original diagnostics."""
+        message = "ExceptionTracker could not collect exception information."
+        return Result.failure(
+            {"tracker_failure": True, "message": message},
+            error=message,
+            context=context,
         )
-        return ExceptionTracker._format_exception_message(error), traceback_text
 
     @classmethod
     def _build_public_error_info(
@@ -523,22 +567,32 @@ class ExceptionTracker:
         retryable: Optional[bool] = None,
     ) -> PublicErrorInfo:
         """Build a lightweight public-safe error payload."""
-        raw_public_error_info = ExceptionTrackerHelper.get_public_error_info_structure()
-        cls._apply_failure_metadata(raw_public_error_info)
-        public_error_info = cast(PublicErrorInfo, raw_public_error_info)
-        public_error_info["error"]["code"] = (
+        code = (
             error_code
-            if type(error_code) is str or type(error_code) is int
+            if (
+                type(error_code) is str
+                and len(error_code) <= cls.CONTEXT_MAX_VALUE_LENGTH
+            )
+            or (
+                type(error_code) is int
+                and error_code.bit_length() <= cls.PUBLIC_MAX_INTEGER_BITS
+            )
             else cls.DEFAULT_PUBLIC_ERROR_CODE
         )
-        public_error_info["error"]["message"] = (
+        message = (
             public_message
             if type(public_message) is str and public_message
             else cls.DEFAULT_PUBLIC_MESSAGE
         )
-        public_error_info["tags"] = cls._copy_public_tags(tags)
-        public_error_info["retryable"] = retryable if type(retryable) is bool else None
-        return public_error_info
+        return {
+            "id": str(uuid.uuid4()),
+            "status": "failure",
+            "success": False,
+            "timestamp": cls._utc_timestamp(),
+            "error": {"code": code, "message": message},
+            "tags": cls._copy_public_tags(tags),
+            "retryable": retryable if type(retryable) is bool else None,
+        }
 
     @classmethod
     def _build_public_fallback_error_info(cls) -> PublicErrorInfo:
@@ -976,7 +1030,7 @@ class ExceptionTracker:
         cls,
         error_info: Dict[str, object],
         context: Optional[str],
-    ) -> Result[object]:
+    ) -> Result[Dict[str, object]]:
         """Build the debug-heavy failure `Result` from a debug payload."""
         quick_info = error_info.get("quick_info")
         error_message = quick_info if isinstance(quick_info, str) else None
@@ -1027,7 +1081,7 @@ class ExceptionTracker:
         mask_paths: MaskPathsInput = (),
         traceback_frame_limit: int = DEFAULT_TRACEBACK_LIMIT,
         cause_limit: int = DEFAULT_TRACEBACK_LIMIT,
-    ) -> Result[object]:
+    ) -> Result[Dict[str, object]]:
         """
         Build detailed internal exception information.
 
@@ -1061,7 +1115,8 @@ class ExceptionTracker:
         > - `user_input`, `params`, and `local_variables` never store raw object references.
         > - Heavy or unsupported context values are replaced with `"<BLOCKED>"` rather than summarized with metadata.
         > - Small copied context values, `traceback`, and `system_info` may still contain sensitive data.
-        > - Use `mask_presets=("private", "traceback", "system_info")` or explicit `mask_paths` before exposing error information outside a trusted boundary.
+        > - Masks select individual debug fields; error messages and locations can remain sensitive.
+        > - Use `get_public_exception_info()` for external responses; masked debug payloads are still internal diagnostics.
 
         ### Note
         > - This is the debug-heavy path for internal diagnostics.
@@ -1071,6 +1126,7 @@ class ExceptionTracker:
         > - `mask_paths` accepts a single tuple path such as `("location", "origin")`.
         > - Use a list for multiple paths, such as `["id", "quick_info", ("error", "message")]`.
         > - A tuple of strings is always treated as one path.
+        > - If capture or masking fails, `data` contains only `tracker_failure=True` and a fixed `message`.
 
         ### Example
         >>> from tbot223_base.exception_tracker import ExceptionTracker
@@ -1097,12 +1153,9 @@ class ExceptionTracker:
             self._apply_debug_error_masks(error_info, mask_presets, mask_paths)
             context = self._get_debug_error_context(error_info)
             return self._build_debug_exception_result(error_info, context)
-        except Exception as e:
-            error_message, traceback_text = self._build_handler_failure_payload(e)
-            return self._build_failure_result(
-                error_message,
-                "Core.ExceptionTracker.get_exception_info, L1",
-                cast(object, traceback_text),
+        except Exception:
+            return self._build_debug_fallback(
+                "Core.ExceptionTracker.get_exception_info, L1"
             )
 
     def get_public_exception_info(
@@ -1163,9 +1216,6 @@ class ExceptionTracker:
                 public_error_info, public_context
             )
         except Exception:
-            print(
-                "An error occurred while building public exception information. Falling back to a safe generic payload."
-            )
             fallback_error_info = self._build_public_fallback_error_info()
             return self._build_public_exception_result(
                 fallback_error_info, public_context
@@ -1179,7 +1229,7 @@ class ExceptionTracker:
         params: ExceptionParams = ((), {}),
         mask_presets: MaskPresetsInput = DEFAULT_MASK_PRESETS,
         mask_paths: MaskPathsInput = (),
-    ) -> Result[object]:
+    ) -> Result[Dict[str, object]]:
         """
         Build a standardized debug-heavy failure `Result` from an exception.
 
@@ -1208,7 +1258,7 @@ class ExceptionTracker:
 
         ### Warning
         > **Security:**
-        > - The returned error information copies only small safe context values but may still contain sensitive data unless suitable `mask_presets` or `mask_paths` are used.
+        > - Debug payloads can contain sensitive messages and locations even with mask presets. Use `get_public_exception_return()` for external responses.
 
         ### Note
         > - This method keeps the existing debug-oriented payload behavior.
@@ -1235,12 +1285,9 @@ class ExceptionTracker:
                 debug_result.context,
                 debug_result.data,
             )
-        except Exception as e:
-            error_message, traceback_text = self._build_handler_failure_payload(e)
-            return self._build_failure_result(
-                error_message,
-                "Core.ExceptionTracker.get_exception_return, L2",
-                cast(object, traceback_text),
+        except Exception:
+            return self._build_debug_fallback(
+                "Core.ExceptionTracker.get_exception_return, L2"
             )
 
     def get_public_exception_return(
@@ -1372,7 +1419,8 @@ class ExceptionTrackerDecorator:
 
     ### Note
     > - Converts uncaught exceptions into standardized `Result` objects.
-    > - Coroutine functions and awaitable results are awaited inside the wrapper so async exceptions are converted too.
+    > - Automatic wrapping may return a failure `Result` before a synchronous function produces an awaitable.
+    > - Use `wrap_awaitable()` when every call must return a coroutine, including failures before an awaitable is created.
     > - Generator and async-generator iteration exceptions occur after the wrapper returns and are not converted.
     > - Best suited for non-critical convenience wrappers.
     > - Not ideal when the caller depends on side effects.
@@ -1382,7 +1430,7 @@ class ExceptionTrackerDecorator:
     ### Warning
     > **Security:**
     > - Wrapped function arguments are captured in `input_context.params` when an exception occurs.
-    > - Use `mask_presets=("private", "traceback", "system_info")` or explicit `mask_paths` before exposing decorator results outside a trusted boundary.
+    > - Decorator failures contain internal debug data, even with mask presets. Build public responses with `get_public_exception_return()` instead.
 
     ### Example
     >>> from tbot223_base.exception_tracker import ExceptionTracker, ExceptionTrackerDecorator
@@ -1418,11 +1466,62 @@ class ExceptionTrackerDecorator:
         self.mask_presets = ExceptionTracker._normalize_mask_presets(mask_presets)
         self.mask_paths = ExceptionTracker._normalize_mask_paths(mask_paths)
 
+    def wrap_awaitable(
+        self, func: Callable[P, Awaitable[R]]
+    ) -> Callable[P, Coroutine[Any, Any, Union[R, Result[object]]]]:
+        """
+        Wrap a coroutine function or awaitable factory in an always-async boundary.
+
+        ### Arguments
+        | Tag | Name | Type | Description |
+        |-----|------|------|-------------|
+        | **(R)** | `func` | `Callable[P, Awaitable[R]]` | Coroutine function or synchronous awaitable factory to wrap. |
+
+        ### Returns
+        `Callable[P, Coroutine[Any, Any, Union[R, Result[object]]]]` — Always returns a coroutine resolving to the original value or a failure result.
+
+        ### Note
+        > - Calling `func` is deferred until the wrapper is awaited.
+        > - Both factory-call failures and failures during await become internal debug results.
+        > - Cancellation and other `BaseException` subclasses propagate.
+
+        ### Example
+        >>> import asyncio
+        >>> from tbot223_base import ExceptionTrackerDecorator
+        >>> @ExceptionTrackerDecorator().wrap_awaitable
+        ... async def value():
+        ...     return 42
+        >>> asyncio.run(value())
+        42
+        """
+
+        @wraps(func)
+        async def awaitable_wrapper(
+            *args: P.args, **kwargs: P.kwargs
+        ) -> Union[R, Result[object]]:
+            try:
+                return await func(*args, **kwargs)
+            except Exception as error:
+                return cast(
+                    Result[object],
+                    self.tracker.get_exception_return(
+                        error=error,
+                        params=(
+                            cast(Tuple[object, ...], args),
+                            cast(Mapping[str, object], kwargs),
+                        ),
+                        mask_presets=self.mask_presets,
+                        mask_paths=self.mask_paths,
+                    ),
+                )
+
+        return awaitable_wrapper
+
     @overload
     def __call__(
         self,
         func: Callable[P, Awaitable[R]],
-    ) -> Callable[P, Awaitable[Union[R, Result[object]]]]: ...
+    ) -> Callable[P, Union[Awaitable[Union[R, Result[object]]], Result[object]]]: ...
 
     @overload
     def __call__(
